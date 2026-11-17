@@ -157,7 +157,7 @@
   }
   function sheepCard(d) {
     return '<a class="sheep" href="#/domba/' + encodeURIComponent(d.tag) + '"><div class="ph">' + img(d.foto, 'Foto domba ' + d.tag) + statusChip(d.status) + '</div><div class="body">' +
-      '<span class="xs muted bold">' + e(d.tag) + ' · ' + e(d.ras) + '</span><span class="bold">Target ' + d.min + '–' + d.max + ' kg</span>' +
+      '<span class="xs muted bold">' + e(d.tag) + '</span><span class="bold">Target ' + d.min + '–' + d.max + ' kg</span>' +
       '<span class="xs">Sekarang ' + kg(d.bobot) + (d.naikBulan ? ' · +' + kg(d.naikBulan) + '/bln' : '') + '</span>' +
       (d.umur ? '<span class="xs muted">' + e(d.sex || 'Jantan') + ' · umur ± ' + e(d.umur) + '</span>' : '') +
       '<span class="price">' + rjt(d.estMin, d.estMax) + '</span>' +
@@ -259,26 +259,24 @@
 
   function pageKatalog() {
     return Promise.all([cfg(), api('katalog')]).then(function (r) {
-      var c = r[0], items = r[1].items, f = load('qb_filter') || { ras: '', rentang: '' };
+      var c = r[0], items = r[1].items, f = load('qb_filter') || { rentang: '' };
       function draw() {
         var list = items.filter(function (d) {
-          if (f.ras && d.ras !== f.ras) return false;
           if (f.rentang) { var p = f.rentang.split('-').map(Number); if (d.max < p[0] || d.min > p[1]) return false; }
           return true;
         });
         document.getElementById('kat-grid').innerHTML = list.length ? list.map(sheepCard).join('') : '<div class="empty" style="grid-column:1/-1">Belum ada domba yang cocok. <a href="#/nabung">Nabung untuk bobot ini →</a></div>';
         document.getElementById('kat-count').innerHTML = '<b>' + list.filter(function (d) { return d.status === 'Tersedia'; }).length + '</b> domba tersedia · yang sudah terjual otomatis disembunyikan';
-        Array.prototype.forEach.call(document.querySelectorAll('[data-ras]'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.ras === f.ras)); b.className = 'btn btn-sm ' + (b.dataset.ras === f.ras ? 'btn-dark' : 'btn-outline'); });
       }
       var ranges = ['', '30-36', '36-40', '40-50'];
       view.innerHTML = '<div class="wrap stack mt-lg"><h1 class="h2">Pilih domba qurbanmu</h1>' +
-        '<div class="card between small"><span>Harga ' + e(tgl(c.harga.mulai).replace(/^\d+ /, '')) + '</span><span><b class="accent">Garut ' + rp(c.harga.garut) + '/kg</b> · <b class="accent">Tanduk ' + rp(c.harga.tanduk) + '/kg</b> · DP ' + c.dpPersen + '%</span></div>' +
-        '<div class="wrap-row" role="group" aria-label="Filter jenis"><button class="btn btn-sm" data-ras="">Semua</button><button class="btn btn-sm" data-ras="Garut">Domba Garut</button><button class="btn btn-sm" data-ras="Tanduk">Domba Tanduk</button>' +
+        '<div class="card between small"><span>Harga ' + e(tgl(c.harga.mulai).replace(/^\d+ /, '')) + '</span><span><b class="accent">Domba Tanduk ' + rp(c.harga.tanduk) + '/kg</b> · DP ' + c.dpPersen + '%</span></div>' +
+        ((c.hargaJadwal && c.hargaJadwal[0]) ? '<div class="card-cream small"><b>Harga naik jadi ' + rp(c.hargaJadwal[0].harga) + '/kg mulai ' + e(tgl(c.hargaJadwal[0].mulai)) + '.</b> Akad lebih awal, harga per kg terkunci di harga hari ini.</div>' : '') +
+        '<div class="wrap-row" role="group" aria-label="Filter bobot">' +
         '<label class="sr-only" for="f-rentang">Target bobot</label><select id="f-rentang" class="input" style="width:auto;padding:8px 12px;font-size:14px">' + ranges.map(function (x) { return '<option value="' + x + '"' + (f.rentang === x ? ' selected' : '') + '>' + (x ? x.replace('-', '–') + ' kg' : 'Semua bobot') + '</option>'; }).join('') + '</select></div>' +
         '<span class="small muted" id="kat-count"></span><div class="grid" id="kat-grid"></div>' +
         '<a class="card-cream stack" style="text-decoration:none;color:inherit" href="#/nabung"><b>Mau bobot lain yang belum ada?</b><span class="small">Nabung dulu sekarang, pilih dombanya saat batch dengan bobot itu sudah siap di kandang.</span><b class="small accent">Mulai nabung qurban →</b></a>' +
         '<p class="xs muted">Harga akhir = bobot riil saat timbang akhir × harga/kg, maksimal batas atas target. Lebih dari target = bonus. Gratis ongkir Jabodetabek.</p></div>';
-      Array.prototype.forEach.call(document.querySelectorAll('[data-ras]'), function (b) { b.onclick = function () { f.ras = b.dataset.ras; store('qb_filter', f); draw(); }; });
       document.getElementById('f-rentang').onchange = function () { f.rentang = this.value; store('qb_filter', f); draw(); };
       draw();
     });
@@ -288,11 +286,11 @@
     return Promise.all([cfg(), api('domba', { tag: tag })]).then(function (r) {
       var c = r[0], d = r[1];
       var media = (d.media || []).length ? d.media : [{ foto: d.foto, t: d.tglTimbang }];
-      view.innerHTML = '<div class="wrap">' + backBar('#/katalog', d.tag + ' · Domba ' + d.ras, 'Target ' + d.min + '–' + d.max + ' kg') +
+      view.innerHTML = '<div class="wrap">' + backBar('#/katalog', d.tag + ' · Domba Tanduk', 'Target ' + d.min + '–' + d.max + ' kg') +
         '<div class="split mt"><div class="gallery"><div class="main">' + img(media[0].foto, 'Foto domba ' + d.tag).replace('<img', '<img id="g-main"') + '</div>' +
         (media.length > 1 ? '<div class="thumbs">' + media.map(function (m, i) { return '<button aria-label="Foto ' + tgl(m.t) + '" aria-current="' + (i === 0) + '" data-src="' + e(m.foto) + '">' + img(m.foto, '') + '</button>'; }).join('') + '</div>' : '') +
         '<span class="xs muted">Foto ' + tgl(media[0].t) + ' · diperbarui tiap bulan</span></div>' +
-        '<div class="stack">' + statusChip(d.status) + '<span class="small muted bold">Eartag ' + e(d.tag) + ' · Domba ' + e(d.ras) + ' · ' + e(d.sex || 'Jantan') + (d.umur ? ' · umur ± ' + e(d.umur) : '') + '</span>' +
+        '<div class="stack">' + statusChip(d.status) + '<span class="small muted bold">Eartag ' + e(d.tag) + ' · Domba Tanduk · ' + e(d.sex || 'Jantan') + (d.umur ? ' · umur ± ' + e(d.umur) : '') + '</span>' +
         '<h1 class="h1" style="font-size:30px">Target ' + d.min + '–' + d.max + ' kg</h1><span class="chip chip-ok" style="align-self:flex-start">Memenuhi syarat sah qurban</span>' +
         '<span class="small">Siap untuk Iduladha ' + e((c.iduladha || '').slice(0, 4)) + (d.kandang ? ' · Kandang ' + e(d.kandang) : '') + '</span>' +
         '<div class="metrics"><div class="card"><span class="xs muted">Bobot masuk</span><b>' + kg(d.bobotAwal) + '</b><span class="xs muted">' + tgl(d.masuk) + '</span></div>' +
@@ -394,7 +392,7 @@
       var c = r[0], d = r[1];
       if (d.status !== 'Tersedia') return pageDiambil(tag);
       var head = '<div class="card row">' + img(d.foto, d.tag).replace('<img', '<img style="width:64px;height:64px;border-radius:12px;object-fit:cover;flex:none"') +
-        '<div class="small"><b style="font-size:15px">' + e(d.tag) + ' · ' + e(d.ras) + ' · ' + d.min + '–' + d.max + ' kg</b><br>Estimasi ' + rp(d.estMin) + ' – ' + rp(d.estMax).replace('Rp', '') + '<br><span class="accent bold">DP ' + c.dpPersen + '%: ' + rp(d.dp) + '</span></div></div>';
+        '<div class="small"><b style="font-size:15px">' + e(d.tag) + ' · ' + d.min + '–' + d.max + ' kg</b><br>Estimasi ' + rp(d.estMin) + ' – ' + rp(d.estMax).replace('Rp', '') + '<br><span class="accent bold">DP ' + c.dpPersen + '%: ' + rp(d.dp) + '</span></div></div>';
       view.innerHTML = '<div class="wrap narrow stack">' + backBar('#/domba/' + encodeURIComponent(tag), 'Pesan domba ' + tag, 'Langkah 1 dari 2 · Syarat & Ketentuan') + head + skStep(c) + '</div>';
       bindSk(function () {
         view.innerHTML = '<div class="wrap narrow stack">' + backBar('#/domba/' + encodeURIComponent(tag), 'Pesan domba ' + tag, 'Langkah 2 dari 2 · Data & pembayaran') + head + formPembeli(c, { cta: 'Tahan domba & lanjut bayar DP ' + rp(d.dp), panggilan: true }) + '</div>';
@@ -406,9 +404,9 @@
 
   function pageNabung() {
     return cfg().then(function (c) {
-      var pilih = { ras: 'Garut', rentang: c.tabunganRentang[0] || '34-36' };
+      var pilih = { ras: 'Tanduk', rentang: c.tabunganRentang[0] || '34-36' };
       function calc() {
-        var p = pilih.rentang.split('-').map(Number), hk = /tanduk/i.test(pilih.ras) ? c.harga.tanduk : c.harga.garut;
+        var p = pilih.rentang.split('-').map(Number), hk = c.harga.tanduk;
         var est = [p[0] * hk, p[1] * hk], dp = Math.ceil(p[1] * hk * c.dpPersen / 100 / 1000) * 1000;
         return { est: est, dp: dp, cicil: Math.ceil((est[1] - dp) / 6 / 1000) * 1000, hk: hk };
       }
@@ -420,18 +418,18 @@
       }
       view.innerHTML = '<div class="wrap narrow stack">' + backBar('#/', 'Nabung qurban', 'Untuk bobot yang belum ada di kandang') +
         '<h1 class="h2">Bobot yang Anda mau belum ada di kandang?</h1><p>Pesan slot bobotnya sekarang dengan DP. Saat batch itu siap, Anda dapat notifikasi email dan bisa memilih dombanya langsung dari katalog.</p>' +
-        '<div class="card stack"><span class="label">1. Jenis domba</span><div class="choice" id="nb-ras">' + ['Garut', 'Tanduk'].map(function (x, i) { return '<label><input type="radio" name="ras" value="' + x + '"' + (i === 0 ? ' checked' : '') + '><span>Domba ' + x + '</span><span class="xs muted">' + rp(x === 'Garut' ? c.harga.garut : c.harga.tanduk) + '/kg</span></label>'; }).join('') + '</div>' +
-        '<span class="label">2. Rentang bobot</span><div class="choice" id="nb-rentang">' + c.tabunganRentang.map(function (x, i) { return '<label><input type="radio" name="rentang" value="' + e(x) + '"' + (i === 0 ? ' checked' : '') + '><span>' + e(x.replace('-', '–')) + ' kg</span></label>'; }).join('') + '</div></div>' +
+        '<div class="card stack"><span class="label">Domba Tanduk · ' + rp(c.harga.tanduk) + '/kg</span>' +
+        '<span class="label">Pilih rentang bobot</span><div class="choice" id="nb-rentang">' + c.tabunganRentang.map(function (x, i) { return '<label><input type="radio" name="rentang" value="' + e(x) + '"' + (i === 0 ? ' checked' : '') + '><span>' + e(x.replace('-', '–')) + ' kg</span></label>'; }).join('') + '</div></div>' +
         '<div class="card stack" id="nb-sum"></div>' +
         '<div class="card stack small"><b>Alurnya</b><span>1. Bayar DP → dapat ID tabungan otomatis.</span><span>2. Cicil kapan saja, saldo tercatat di Domba Saya.</span><span>3. Domba sesuai bobot ready → notifikasi email, Anda pilih dari katalog lebih dulu.</span><span>4. Saldo tabungan jadi DP domba pilihan; pantau sampai hari H.</span></div>' +
         '<button class="btn btn-primary btn-block" id="nb-next">Lanjut</button></div>';
-      Array.prototype.forEach.call(document.querySelectorAll('#nb-ras input, #nb-rentang input'), function (i) { i.onchange = function () { pilih[i.name] = i.value; summary(); }; });
+      Array.prototype.forEach.call(document.querySelectorAll('#nb-rentang input'), function (i) { i.onchange = function () { pilih[i.name] = i.value; summary(); }; });
       summary();
       document.getElementById('nb-next').onclick = function () {
         var k = calc();
-        view.innerHTML = '<div class="wrap narrow stack">' + backBar('#/nabung', 'Nabung ' + pilih.ras + ' ' + pilih.rentang.replace('-', '–') + ' kg', 'Syarat & Ketentuan') + skStep(c) + '</div>';
+        view.innerHTML = '<div class="wrap narrow stack">' + backBar('#/nabung', 'Nabung Tanduk ' + pilih.rentang.replace('-', '–') + ' kg', 'Syarat & Ketentuan') + skStep(c) + '</div>';
         bindSk(function () {
-          view.innerHTML = '<div class="wrap narrow stack">' + backBar('#/nabung', 'Nabung ' + pilih.ras + ' ' + pilih.rentang.replace('-', '–') + ' kg', 'Data pembeli') + formPembeli(c, { cta: 'Buat tabungan & bayar DP ' + rp(k.dp) }) + '</div>';
+          view.innerHTML = '<div class="wrap narrow stack">' + backBar('#/nabung', 'Nabung Tanduk ' + pilih.rentang.replace('-', '–') + ' kg', 'Data pembeli') + formPembeli(c, { cta: 'Buat tabungan & bayar DP ' + rp(k.dp) }) + '</div>';
           bindPesan(c, function (data) { data.ras = pilih.ras; data.rentang = pilih.rentang; return api('nabung', data); });
           window.scrollTo(0, 0);
         });
@@ -510,7 +508,7 @@
       view.innerHTML = '<div class="wrap narrow stack mt-lg"><div class="between"><h1 class="h2">Assalamu\'alaikum, ' + e((d.nama || '').split(' ')[0]) + '</h1><button class="btn btn-ghost" id="out">Keluar</button></div>' +
         (d.pesanan.length ? d.pesanan.map(function (o) {
           return '<a class="card row" style="text-decoration:none;color:inherit" href="#/pesanan/' + e(o.id) + '">' + img(o.domba && o.domba.foto, o.tag).replace('<img', '<img style="width:72px;height:72px;border-radius:12px;object-fit:cover;flex:none"') +
-            '<div class="stack" style="gap:2px;flex:1"><div class="between"><b>' + (o.panggilan ? '"' + e(o.panggilan) + '" · ' : '') + e(o.tag || ('Tabungan ' + o.ras)) + '</b>' + statusChip(o.status) + '</div>' +
+            '<div class="stack" style="gap:2px;flex:1"><div class="between"><b>' + (o.panggilan ? '"' + e(o.panggilan) + '" · ' : '') + e(o.tag || 'Tabungan') + '</b>' + statusChip(o.status) + '</div>' +
             '<span class="small muted">' + e(o.id) + ' · target ' + o.min + '–' + o.max + ' kg</span><span class="small">Dana masuk <b>' + rp(o.hitung.paid) + '</b>' + (o.domba && o.domba.bobot ? ' · bobot ' + kg(o.domba.bobot) : '') + '</span></div></a>';
         }).join('') : '<div class="card empty">Belum ada pesanan. <a href="#/katalog">Pilih domba →</a></div>') +
         '<div class="wrap-row"><a class="btn btn-outline" href="#/katalog">Pesan domba lagi</a><a class="btn btn-outline" href="#/nabung">Nabung qurban</a></div></div>';
@@ -546,8 +544,8 @@
       var head = '<div class="card row" style="gap:14px">' + img(d.foto, 'Domba ' + o.tag).replace('<img', '<img style="width:92px;height:92px;border-radius:14px;object-fit:cover;flex:none"') +
         '<div class="stack" style="gap:3px">' +
         (o.tag ? '<b style="font-size:20px">' + (o.panggilan ? '"' + e(o.panggilan) + '"' : e(o.tag)) + (full ? ' <button class="btn btn-ghost btn-sm" id="edit-nama" style="min-height:0;padding:0 4px">' + icon('pen', 14) + ' ' + (o.panggilan ? 'ubah' : 'beri nama') + '</button>' : '') + '</b>' +
-          '<span class="small bold">' + e(o.tag) + ' · ' + e(o.ras) + '</span><span class="small muted">Target ' + o.min + '–' + o.max + ' kg' + (d.umur ? ' · ± ' + e(d.umur) : '') + (d.kandang ? ' · ' + e(d.kandang) : '') + '</span>'
-          : '<b style="font-size:20px">Tabungan ' + e(o.ras) + '</b><span class="small muted">Rentang ' + o.min + '–' + o.max + ' kg</span>') +
+          '<span class="small bold">' + e(o.tag) + '</span><span class="small muted">Target ' + o.min + '–' + o.max + ' kg' + (d.umur ? ' · ± ' + e(d.umur) : '') + (d.kandang ? ' · ' + e(d.kandang) : '') + '</span>'
+          : '<b style="font-size:20px">Tabungan Tanduk</b><span class="small muted">Rentang ' + o.min + '–' + o.max + ' kg</span>') +
         '<div class="wrap-row">' + statusChip(o.status) + (d.status && o.tag ? '<span class="chip ' + (/sehat/i.test(d.status) ? 'chip-ok' : 'chip-hold') + '">' + e(d.status) + '</span>' : '') + '</div></div></div>';
       var html = '<div class="wrap narrow stack">' + backBar('#/saya', o.id, o.nama) + head;
 
@@ -556,7 +554,7 @@
       if (o.status === 'Batal' || o.status === 'Ajukan Batal') html += '<div class="card-cream stack"><b>' + (o.status === 'Batal' ? 'Pesanan dibatalkan' : 'Pengajuan batal sedang diproses') + '</b><span class="small">Dana dikembalikan ' + rp(o.refund) + (o.potongan ? ' (potongan biaya riil ' + rp(o.potongan) + ')' : '') + ', paling lambat 2 minggu.</span></div>';
 
       if (o.tipe === 'Tabungan' && o.status === 'Tabungan') {
-        html += '<div class="card-dark stack"><b class="h3" style="color:#fff">Saldo tabungan ' + rp(o.hitung.paid) + '</b><span class="small" style="color:var(--cream)">Saat domba ' + e(o.ras) + ' ' + o.min + '–' + o.max + ' kg siap, Anda bisa memilihnya di sini lebih dulu. Harga/kg terkunci saat memilih.</span>' +
+        html += '<div class="card-dark stack"><b class="h3" style="color:#fff">Saldo tabungan ' + rp(o.hitung.paid) + '</b><span class="small" style="color:var(--cream)">Saat domba Tanduk ' + o.min + '–' + o.max + ' kg siap, Anda bisa memilihnya di sini lebih dulu. Harga/kg terkunci saat memilih.</span>' +
           ((o.pilihan || []).length ? '<a class="btn btn-primary" href="#/pesanan/' + e(o.id) + '/pilih">Pilih domba sekarang (' + o.pilihan.length + ' tersedia)</a>' : '<span class="small">Belum ada domba yang cocok — kami kabari lewat email.</span>') + '</div>';
       }
 
@@ -655,12 +653,12 @@
       function draw() {
         var s = list.filter(function (x) { return x.tag === sel; })[0];
         view.innerHTML = '<div class="wrap narrow stack">' + backBar('#/pesanan/' + o.id, pilih ? 'Pilih domba tabungan' : 'Ganti domba', o.id + (pilih ? '' : ' · sisa kesempatan ' + (c.maksGanti - o.jumlahGanti) + '×')) +
-          (o.tag ? '<div class="card row">' + img(o.domba && o.domba.foto, o.tag).replace('<img', '<img style="width:64px;height:64px;border-radius:12px;object-fit:cover;flex:none"') + '<div class="small"><span class="xs muted bold">DOMBA SAAT INI</span><br><b>' + e(o.tag) + ' · ' + e(o.ras) + ' · ' + o.min + '–' + o.max + ' kg</b><br>Dana masuk ' + rp(o.hitung.paid) + '</div></div>' : '<div class="card small">Saldo tabungan <b>' + rp(o.hitung.paid) + '</b> akan menjadi DP domba yang Anda pilih.</div>') +
+          (o.tag ? '<div class="card row">' + img(o.domba && o.domba.foto, o.tag).replace('<img', '<img style="width:64px;height:64px;border-radius:12px;object-fit:cover;flex:none"') + '<div class="small"><span class="xs muted bold">DOMBA SAAT INI</span><br><b>' + e(o.tag) + ' · ' + o.min + '–' + o.max + ' kg</b><br>Dana masuk ' + rp(o.hitung.paid) + '</div></div>' : '<div class="card small">Saldo tabungan <b>' + rp(o.hitung.paid) + '</b> akan menjadi DP domba yang Anda pilih.</div>') +
           '<div class="between"><b>' + (pilih ? 'Pilih domba' : 'Pilih pengganti') + '</b><span class="xs muted">hanya stok tersedia</span></div>' +
           (list.length ? '<div class="stack" role="radiogroup">' + list.map(function (x) {
             var diff = x.estMax - (o.max * (o.hargaKg || x.hargaKg));
             return '<button class="card row" role="radio" aria-checked="' + (x.tag === sel) + '" data-tag="' + e(x.tag) + '" style="text-align:left;cursor:pointer;border:' + (x.tag === sel ? '2px solid var(--pumpkin)' : '1px solid var(--line)') + '">' +
-              img(x.foto, x.tag).replace('<img', '<img style="width:72px;height:72px;border-radius:12px;object-fit:cover;flex:none"') + '<span style="flex:1" class="small"><b style="font-size:15px">' + e(x.tag) + ' · ' + e(x.ras) + '</b><br>Target ' + x.min + '–' + x.max + ' kg · sekarang ' + kg(x.bobot) + '<br><b class="accent">' + rjt(x.estMin, x.estMax) + '</b></span>' +
+              img(x.foto, x.tag).replace('<img', '<img style="width:72px;height:72px;border-radius:12px;object-fit:cover;flex:none"') + '<span style="flex:1" class="small"><b style="font-size:15px">' + e(x.tag) + '</b><br>Target ' + x.min + '–' + x.max + ' kg · sekarang ' + kg(x.bobot) + '<br><b class="accent">' + rjt(x.estMin, x.estMax) + '</b></span>' +
               (!pilih ? '<span class="chip">' + (diff === 0 ? 'Rp0' : (diff > 0 ? '+' : '−') + rp(Math.abs(diff)).replace('Rp', 'Rp')) + '</span>' : '') + '</button>';
           }).join('') + '</div>' : '<div class="card empty">Belum ada domba yang tersedia saat ini.</div>') +
           (s ? '<div class="card stack small"><b class="h3">Ringkasan</b><div class="kv"><span>Domba ' + (pilih ? 'pilihan' : 'baru') + '</span><b>' + e(s.tag) + ' · ' + s.min + '–' + s.max + ' kg</b></div><div class="kv"><span>Dana dipindahkan utuh</span><b>' + rp(o.hitung.paid) + '</b></div>' +
@@ -884,24 +882,28 @@
   function drawStok(d) {
     var avail = d.items.filter(function (x) { return x.tampil && !x.pesanan; });
     view.innerHTML = adminBar('stok') + '<div class="wrap stack mt"><div class="card small between"><span>Domba di QDF Ternak: <b>' + d.items.length + '</b></span><span>Tampil &amp; tersedia: <b>' + avail.length + '</b> · dipesan: <b>' + d.items.filter(function (x) { return x.pesanan; }).length + '</b></span></div>' +
-      '<p class="xs muted">Bobot, foto, kandang &amp; status diambil otomatis dari QDF Ternak. Di sini hanya diatur ras, target bobot, umur perkiraan, dan tampil/tidaknya di web. Domba berstatus Sakit otomatis tidak tampil.</p>' +
+      '<p class="xs muted">Bobot, foto, kandang &amp; status diambil otomatis dari QDF Ternak. Target bobot terisi otomatis dari QDF Ternak (bisa diubah per domba). Di sini diatur target bobot, umur perkiraan, dan tampil/tidaknya di web. Domba berstatus Sakit otomatis tidak tampil.</p>' +
       d.items.map(function (x, i) {
         return '<form class="card stack" data-i="' + i + '"><div class="stok-row">' + img(x.foto, x.tag) + '<div class="stack" style="gap:2px"><div class="between"><b>' + e(x.tag) + ' · ' + e(x.sex) + '</b>' + (x.pesanan ? statusChip(x.pesanan.status === 'Ditahan' ? 'Ditahan' : x.pesanan.status) : (x.tampil ? '<span class="chip chip-ok">Tampil</span>' : '<span class="chip chip-grey">Tidak tampil</span>')) + '</div>' +
           '<span class="xs muted">' + kg(x.bobot) + ' · timbang ' + tgl(x.tglTimbang) + ' · ' + e(x.kandang) + ' · ' + e(x.status) + (x.pemilik ? ' · ' + e(x.pemilik) : '') + '</span>' +
           (x.pesanan ? '<a class="xs" href="#/admin/pesanan/' + e(x.pesanan.id) + '">' + e(x.pesanan.id) + ' · ' + e(x.pesanan.nama) + '</a>' : '') + '</div></div>' +
-          '<div class="grid-form g4"><div class="field"><label>Ras</label><select class="input" name="ras"><option' + (x.ras !== 'Tanduk' ? ' selected' : '') + '>Garut</option><option' + (x.ras === 'Tanduk' ? ' selected' : '') + '>Tanduk</option></select></div>' +
+          '<div class="grid-form">' +
           '<div class="field"><label>Target min (kg)</label><input class="input" name="min" inputmode="decimal" value="' + e(x.min) + '"></div><div class="field"><label>Target max (kg)</label><input class="input" name="max" inputmode="decimal" value="' + e(x.max) + '"></div>' +
           '<div class="field"><label>Umur perkiraan</label><input class="input" name="umur" value="' + e(x.umur) + '" placeholder="10–12 bln"></div></div>' +
+          (x.dariQdf ? '<span class="xs muted">Target awal diambil dari QDF Ternak; tersimpan tetap setelah Anda menekan Simpan.</span>' : '') +
+          (x.aman && x.min > x.aman ? '<span class="xs" style="color:#b3261e">Target ' + e(x.min) + ' kg melebihi perkiraan aman (' + x.aman + ' kg = bobot sekarang + kenaikan aman sampai timbang akhir). Pertimbangkan menurunkan.</span>' : '') +
+          (x.dariQdf ? '<span class="xs muted">Target awal diambil dari QDF Ternak; tersimpan tetap setelah Anda menekan Simpan.</span>' : '') +
+          (x.aman && x.min > x.aman ? '<span class="xs" style="color:#b3261e">Target ' + e(x.min) + ' kg melebihi perkiraan aman (' + x.aman + ' kg = bobot sekarang + kenaikan aman sampai timbang akhir). Pertimbangkan menurunkan.</span>' : '') +
           '<div class="between"><label class="check"><input type="checkbox" name="tampil"' + (x.tampil ? ' checked' : '') + '> Tampil di web</label><button class="btn btn-dark btn-sm" type="submit">Simpan</button></div></form>';
       }).join('') +
       '<form class="card stack" id="f-manual"><b class="h3">Pesan manual (pembeli via WhatsApp)</b><span class="xs muted">Memakai sistem tahan yang sama dengan web, jadi tidak bisa tabrakan. Pembeli menerima email berisi instruksi bayar &amp; bisa masuk dengan ID pesanan + nomor WA.</span>' +
-      '<div class="field"><label for="m-tag">Domba</label><select class="input" id="m-tag" name="tag">' + d.items.filter(function (x) { return !x.pesanan && x.max; }).map(function (x) { return '<option value="' + e(x.tag) + '">' + e(x.tag) + ' · ' + e(x.ras) + ' · ' + x.min + '–' + x.max + ' kg' + (x.tampil ? '' : ' (tidak tampil)') + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label for="m-tag">Domba</label><select class="input" id="m-tag" name="tag">' + d.items.filter(function (x) { return !x.pesanan && x.max; }).map(function (x) { return '<option value="' + e(x.tag) + '">' + e(x.tag) + ' · ' + x.min + '–' + x.max + ' kg' + (x.tampil ? '' : ' (tidak tampil)') + '</option>'; }).join('') + '</select></div>' +
       '<div class="grid-form"><div class="field"><label for="m-nama">Nama pembeli</label><input class="input" id="m-nama" name="nama" required></div><div class="field"><label for="m-wa">No. WhatsApp</label><input class="input" id="m-wa" name="wa" type="tel" required></div></div>' +
       '<div class="field"><label for="m-email">Email pembeli</label><input class="input" id="m-email" name="email" type="email" required></div><button class="btn btn-primary" type="submit">Tahan domba &amp; kirim instruksi bayar</button></form></div>';
     Array.prototype.forEach.call(document.querySelectorAll('form[data-i]'), function (f) {
       f.onsubmit = function (ev) {
         ev.preventDefault(); var x = d.items[Number(f.dataset.i)], dd = formData(f), btn = f.querySelector('[type=submit]'); busy(btn, true);
-        api('simpanStok', { tag: x.tag, ras: dd.ras, min: dd.min, max: dd.max, umur: dd.umur, tampil: !!dd.tampil }).then(function (res) { toast(x.tag + ' disimpan.'); drawStok(res); }).catch(function (er) { busy(btn, false); toast(er.message, true); });
+        api('simpanStok', { tag: x.tag, ras: 'Tanduk', min: dd.min, max: dd.max, umur: dd.umur, tampil: !!dd.tampil }).then(function (res) { toast(x.tag + ' disimpan.'); drawStok(res); }).catch(function (er) { busy(btn, false); toast(er.message, true); });
       };
     });
     var fm = document.getElementById('f-manual');
@@ -920,19 +922,19 @@
     var ymd = first.getFullYear() + '-' + String(first.getMonth() + 1).padStart(2, '0') + '-01';
     var keys = [['dp_persen', 'DP minimal (%)'], ['tahan_menit', 'Waktu tahan (menit)'], ['biaya_harian', 'Biaya pakan + tenaga / ekor / hari (Rp)'], ['biaya_sembelih', 'Biaya jasa sembelih (Rp, 0 = belum ditetapkan)'], ['maks_ganti', 'Maksimal ganti domba'],
       ['tanggal_iduladha', 'Tanggal Iduladha (yyyy-mm-dd)'], ['pelunasan_h', 'Batas pelunasan (H-)'], ['timbang_akhir_h', 'Timbang akhir (H-)'], ['batas_ganti_h', 'Batas ganti (H-)'],
-      ['bank_nama', 'Bank transfer manual'], ['bank_rekening', 'Nomor rekening'], ['bank_atas_nama', 'Atas nama'], ['url_web', 'Alamat web'], ['maps_url', 'Link Google Maps'], ['paket_aqiqah', 'Keterangan paket aqiqah'], ['batch_label', 'Label batch di beranda'], ['tabungan_rentang', 'Rentang tabungan (pisahkan koma)']];
+      ['bank_nama', 'Bank transfer manual'], ['bank_rekening', 'Nomor rekening'], ['bank_atas_nama', 'Atas nama'], ['url_web', 'Alamat web'], ['maps_url', 'Link Google Maps'], ['paket_aqiqah', 'Keterangan paket aqiqah'], ['batch_label', 'Label batch di beranda'], ['tabungan_rentang', 'Rentang tabungan (pisahkan koma)'], ['rentang_kg', 'Lebar range target (kg)'], ['naik_aman_bulan', 'Kenaikan aman (kg/bulan) untuk peringatan target']];
     view.innerHTML = adminBar('harga') + '<div class="wrap narrow stack mt">' +
-      '<section class="card stack"><div class="between"><b class="h3">Harga per kg hidup</b><span class="xs muted">berlaku sekarang</span></div><div class="kv"><span>Domba Garut</span><b>' + rp(d.sekarang.garut) + '/kg</b></div><div class="kv"><span>Domba Tanduk</span><b>' + rp(d.sekarang.tanduk) + '/kg</b></div></section>' +
+      '<section class="card stack"><div class="between"><b class="h3">Harga per kg hidup</b><span class="xs muted">berlaku sekarang</span></div><div class="kv"><span>Domba Tanduk</span><b>' + rp(d.sekarang.tanduk) + '/kg</b></div></section>' +
       '<form class="card stack" id="f-harga"><b class="h3">Jadwalkan harga baru</b><div class="field"><label for="h-mulai">Berlaku mulai</label><input class="input" type="date" id="h-mulai" name="mulai" value="' + ymd + '" required></div>' +
-      '<div class="grid-form"><div class="field"><label for="h-g">Garut (Rp/kg)</label><input class="input" id="h-g" name="garut" inputmode="numeric" value="' + d.sekarang.garut + '" required></div><div class="field"><label for="h-t">Tanduk (Rp/kg)</label><input class="input" id="h-t" name="tanduk" inputmode="numeric" value="' + d.sekarang.tanduk + '" required></div></div>' +
+      '<div class="grid-form"><div class="field"><label for="h-t">Harga domba Tanduk (Rp/kg)</label><input class="input" id="h-t" name="tanduk" inputmode="numeric" value="' + d.sekarang.tanduk + '" required></div></div>' +
       '<span class="xs muted">Pesanan yang sudah DP tetap memakai harga saat akad. Katalog &amp; DP otomatis menyesuaikan saat tanggal berlaku tiba.</span><button class="btn btn-primary" type="submit">Simpan &amp; jadwalkan harga</button></form>' +
-      '<section class="card stack small"><b class="h3">Riwayat harga</b>' + d.riwayat.map(function (r) { return '<div class="kv"><span>' + tgl(r.mulai) + '</span><span>Garut ' + rp(r.garut) + ' · Tanduk ' + rp(r.tanduk) + ' <span class="muted">· ' + e(r.oleh) + '</span></span></div>'; }).join('') + '</section>' +
+      '<section class="card stack small"><b class="h3">Riwayat harga</b>' + d.riwayat.map(function (r) { return '<div class="kv"><span>' + tgl(r.mulai) + '</span><span>' + rp(r.tanduk) + '/kg <span class="muted">· ' + e(r.oleh) + '</span></span></div>'; }).join('') + '</section>' +
       '<form class="card stack" id="f-set"><b class="h3">Pengaturan pesanan</b>' + keys.map(function (k) { return '<div class="field"><label for="s-' + k[0] + '">' + e(k[1]) + '</label><input class="input" id="s-' + k[0] + '" name="' + k[0] + '" value="' + e(S[k[0]]) + '"></div>'; }).join('') +
       '<button class="btn btn-dark" type="submit">Simpan pengaturan</button></form></div>';
     var fh = document.getElementById('f-harga');
     fh.onsubmit = function (ev) {
       ev.preventDefault(); var dd = formData(fh), btn = fh.querySelector('[type=submit]'); busy(btn, true);
-      api('simpanHarga', { mulai: dd.mulai, garut: Number(String(dd.garut).replace(/\D/g, '')), tanduk: Number(String(dd.tanduk).replace(/\D/g, '')) }).then(function (res) { toast('Harga dijadwalkan.'); state.cfg = null; store('qb_cfg', null); drawHarga(res); }).catch(function (x) { busy(btn, false); toast(x.message, true); });
+      api('simpanHarga', { mulai: dd.mulai, harga: Number(String(dd.tanduk).replace(/\D/g, '')) }).then(function (res) { toast('Harga dijadwalkan.'); state.cfg = null; store('qb_cfg', null); drawHarga(res); }).catch(function (x) { busy(btn, false); toast(x.message, true); });
     };
     var fs = document.getElementById('f-set');
     fs.onsubmit = function (ev) {
