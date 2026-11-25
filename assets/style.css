@@ -1,15 +1,12 @@
 /* Qurbandong — Web Pelanggan */
-/* Font Paralucent: taruh file OTF di assets/fonts/ lalu hapus tanda komentar dua baris ini.
-@font-face { font-family: 'Paralucent'; src: url('fonts/Paralucent-Medium.otf') format('opentype'); font-weight: 400 600; font-display: swap; }
-@font-face { font-family: 'Paralucent'; src: url('fonts/Paralucent-Bold.otf') format('opentype'); font-weight: 700 800; font-display: swap; }
-*/
 
 :root {
   --cream: #FFE5C8; --pumpkin: #E9762B; --hunter: #41644A; --pakistan: #0D4715; --jet: #2A2D2B;
   --bg: #FFF6EC; --card: #FFFFFF; --soft: #FFF1E3; --line: #E9DDCC; --muted: #5E625F; --accent-text: #B4561A; --accent-dark: #8A4A14;
   --jet-2: #3A3D3B; --danger: #B3261E;
   --r: 16px; --r-sm: 12px;
-  --font: 'Paralucent', 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-head: 'Barlow Condensed', 'Plus Jakarta Sans', system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -17,7 +14,7 @@ body { margin: 0; background: var(--bg); color: var(--jet); font-family: var(--f
 img { max-width: 100%; display: block; }
 a { color: var(--accent-text); }
 a:hover { color: var(--accent-dark); }
-h1, h2, h3 { line-height: 1.15; margin: 0; }
+h1, h2, h3, .h1, .h2, .h3 { font-family: var(--font-head); line-height: 1.1; margin: 0; letter-spacing: .2px; }
 p { margin: 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--pumpkin); outline-offset: 2px; }
@@ -39,9 +36,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .mt { margin-top: 12px; } .mt-lg { margin-top: 24px; } .mt-xl { margin-top: 40px; }
 .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; color: var(--accent-text); text-transform: uppercase; }
 .section { padding: 36px 0 0; }
-.h1 { font-size: clamp(28px, 6vw, 46px); font-weight: 700; }
-.h2 { font-size: clamp(22px, 4.2vw, 32px); font-weight: 700; }
-.h3 { font-size: 18px; font-weight: 700; }
+.h1 { font-size: clamp(34px, 7vw, 56px); font-weight: 700; }
+.h2 { font-size: clamp(26px, 5vw, 38px); font-weight: 700; }
+.h3 { font-size: 22px; font-weight: 700; }
 
 /* header */
 .site-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 246, 236, .96); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
