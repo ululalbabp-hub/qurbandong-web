@@ -158,7 +158,8 @@
   /* ---------------- shell ---------------- */
   function renderHeader() {
     var s = state.sesi, h = location.hash || '#/';
-    var nav = '<a class="nav-hide' + (/^#\/katalog/.test(h) ? ' active' : '') + '" href="#/katalog">Katalog</a>' +
+    var nav = '<a class="' + (/^#\/?$/.test(h) ? 'active' : '') + '" href="#/">Beranda</a>' +
+      '<a class="nav-hide' + (/^#\/katalog/.test(h) ? ' active' : '') + '" href="#/katalog">Katalog</a>' +
       '<a class="nav-hide' + (/^#\/nabung/.test(h) ? ' active' : '') + '" href="#/nabung">Nabung</a>';
     if (s && s.peran === 'admin') nav += '<a href="#/admin" class="' + (/^#\/admin/.test(h) ? 'active' : '') + '">Admin</a>';
     nav += s ? '<a class="pill-outline' + (/^#\/(saya|pesanan)/.test(h) ? ' active' : '') + '" href="#/saya">Domba Saya</a>' : '<a class="pill-outline" href="#/masuk">Masuk</a>';
@@ -265,7 +266,7 @@
         ['Bayarnya lewat apa? Bisa lihat ke kandang?', 'Pembayaran via Virtual Account atau transfer bank. Kandang di Gunung Wangun, Pamoyanan, Bogor terbuka untuk kunjungan setiap hari pukul 08.00–17.00.']
       ];
       var html = '<div class="wrap">' +
-        '<section class="hero mt">' + '<img src="' + IMG + 'domba-3.jpg" alt="Domba di kandang Qurbandong Farm">' +
+        '<section class="hero mt">' + '<img src="' + IMG + 'domba-hero.jpg" class="hero-foto" alt="Domba di kandang Qurbandong Farm">' +
         '<div class="hero-inner"><span class="chip">Qurban Iduladha ' + e((c.iduladha || '').slice(0, 4)) + ' · Bogor</span>' +
         '<h1 class="h1">Pilih sendiri dombanya. Pantau sampai hari H.</h1><p>Bukan "domba sesuai foto" — domba asli bereartag, ditimbang tiap bulan.</p>' +
         '<div class="wrap-row"><a class="btn btn-primary" href="#/katalog">Pilih domba qurban</a><a class="btn btn-outline" href="#/nabung">Nabung qurban</a></div></div></section>' +

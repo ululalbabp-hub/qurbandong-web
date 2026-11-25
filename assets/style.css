@@ -2,7 +2,7 @@
 
 :root {
   --cream: #FFE5C8; --pumpkin: #E9762B; --hunter: #41644A; --pakistan: #0D4715; --jet: #2A2D2B;
-  --bg: #FFF6EC; --card: #FFFFFF; --soft: #FFF1E3; --line: #E9DDCC; --muted: #5E625F; --accent-text: #B4561A; --accent-dark: #8A4A14;
+  --bg: #FFFFFF; --card: #FFFFFF; --soft: #FFF1E3; --line: #E9DDCC; --muted: #5E625F; --accent-text: #B4561A; --accent-dark: #8A4A14;
   --jet-2: #3A3D3B; --danger: #B3261E;
   --r: 16px; --r-sm: 12px;
   --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -41,7 +41,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .h3 { font-size: 22px; font-weight: 700; }
 
 /* header */
-.site-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 246, 236, .96); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
+.site-header { position: sticky; top: 0; z-index: 30; background: rgba(255, 255, 255, .96); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
 .site-header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 68px; }
 .brand { display: flex; align-items: center; }
 .brand img { height: 50px; width: auto; }
@@ -238,3 +238,5 @@ details.faq p { margin-top: 10px; color: var(--muted); font-size: 14px; }
 
 .srow-saran { align-self: flex-start; margin-top: 3px; background: var(--cream); color: var(--accent-dark); border: 0; border-radius: 999px; padding: 4px 10px; font-weight: 700; cursor: pointer; }
 .srow-saran:hover { background: #FFD9B0; }
+.hero img.hero-foto { object-position: 50% 70%; }
+@media (min-width: 860px) { .hero img.hero-foto { object-position: 50% 26%; } }
