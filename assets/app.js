@@ -1017,7 +1017,11 @@
       if (bad) { toast('Isi target min dan max dulu untuk ' + d.items[Number(bad.dataset.i)].tag + ' sebelum menampilkannya.', true); bad.scrollIntoView({ block: 'center' }); qs('[name=min]', bad).focus(); return; }
       busy(btn, true); btn.innerHTML = 'Menyimpan ' + ch.length + ' domba…';
       var items = ch.map(function (r) { var x = d.items[Number(r.dataset.i)], v = cur(r); return { tag: x.tag, min: v.min, max: v.max, umur: v.umur, tampil: v.tampil, catatan: x.catatan || '' }; });
-      api('simpanStokMassal', { items: items }).then(function (res) {
+      api('simpanStokMassal', { items: items }).catch(function (er) {
+        if (!/Aksi tidak dikenal/.test(er.message)) throw er;
+        /* server belum diperbarui: simpan satu per satu seperti cara lama */
+        return items.reduce(function (pr, it) { return pr.then(function () { return api('simpanStok', it); }); }, Promise.resolve());
+      }).then(function (res) {
         putC('adminStok', {}, res); toast(ch.length + ' domba disimpan. Katalog sudah diperbarui.'); drawStok(res);
       }).catch(function (er) { busy(btn, false); toast(er.message, true); });
     };
