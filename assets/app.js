@@ -881,31 +881,65 @@
   }
   function drawStok(d) {
     var avail = d.items.filter(function (x) { return x.tampil && !x.pesanan; });
+    var qs = function (sel, root) { return (root || document).querySelector(sel); };
+    var norm = function (t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
+    function rowHtml(x, i) {
+      var warn = x.aman && x.min > x.aman ? '<span class="srow-warn xs" title="Perkiraan bobot aman sampai timbang akhir: ' + x.aman + ' kg">⚠ target &gt; aman ' + x.aman + ' kg</span>' : '';
+      var chip = x.pesanan ? statusChip(x.pesanan.status === 'Ditahan' ? 'Ditahan' : x.pesanan.status) : (/^sehat$/i.test(x.status || 'Sehat') ? '' : '<span class="chip chip-grey">' + e(x.status) + '</span>');
+      return '<div class="srow" data-i="' + i + '">' +
+        '<label class="srow-chk" title="Tampil di web"><input type="checkbox" name="tampil"' + (x.tampil ? ' checked' : '') + ' aria-label="Tampil di web ' + e(x.tag) + '"></label>' +
+        img(x.foto, x.tag, 'srow-img') +
+        '<div class="srow-info"><div><b>' + e(x.tag) + '</b> <span class="xs muted">' + e(x.sex) + ' · ' + e(x.kandang) + '</span> ' + chip + '</div>' +
+        '<div class="xs muted">' + kg(x.bobot) + ' · timbang ' + tglPendek(x.tglTimbang) + (x.pesanan ? ' · <a href="#/admin/pesanan/' + e(x.pesanan.id) + '">' + e(x.pesanan.id) + '</a>' : '') + '</div>' + warn + '</div>' +
+        '<div class="srow-in"><input class="input" name="min" inputmode="decimal" value="' + e(x.min) + '" placeholder="min" aria-label="Target min ' + e(x.tag) + '"><span class="muted">–</span><input class="input" name="max" inputmode="decimal" value="' + e(x.max) + '" placeholder="max" aria-label="Target max ' + e(x.tag) + '"><input class="input srow-umur" name="umur" value="' + e(x.umur) + '" placeholder="Umur" aria-label="Umur ' + e(x.tag) + '"></div></div>';
+    }
     view.innerHTML = adminBar('stok') + '<div class="wrap stack mt"><div class="card small between"><span>Domba di QDF Ternak: <b>' + d.items.length + '</b></span><span>Tampil &amp; tersedia: <b>' + avail.length + '</b> · dipesan: <b>' + d.items.filter(function (x) { return x.pesanan; }).length + '</b></span></div>' +
-      '<p class="xs muted">Bobot, foto, kandang &amp; status diambil otomatis dari QDF Ternak. Target bobot terisi otomatis dari QDF Ternak (bisa diubah per domba). Di sini diatur target bobot, umur perkiraan, dan tampil/tidaknya di web. Domba berstatus Sakit otomatis tidak tampil.</p>' +
-      d.items.map(function (x, i) {
-        return '<form class="card stack" data-i="' + i + '"><div class="stok-row">' + img(x.foto, x.tag) + '<div class="stack" style="gap:2px"><div class="between"><b>' + e(x.tag) + ' · ' + e(x.sex) + '</b>' + (x.pesanan ? statusChip(x.pesanan.status === 'Ditahan' ? 'Ditahan' : x.pesanan.status) : (x.tampil ? '<span class="chip chip-ok">Tampil</span>' : '<span class="chip chip-grey">Tidak tampil</span>')) + '</div>' +
-          '<span class="xs muted">' + kg(x.bobot) + ' · timbang ' + tgl(x.tglTimbang) + ' · ' + e(x.kandang) + ' · ' + e(x.status) + (x.pemilik ? ' · ' + e(x.pemilik) : '') + '</span>' +
-          (x.pesanan ? '<a class="xs" href="#/admin/pesanan/' + e(x.pesanan.id) + '">' + e(x.pesanan.id) + ' · ' + e(x.pesanan.nama) + '</a>' : '') + '</div></div>' +
-          '<div class="grid-form">' +
-          '<div class="field"><label>Target min (kg)</label><input class="input" name="min" inputmode="decimal" value="' + e(x.min) + '"></div><div class="field"><label>Target max (kg)</label><input class="input" name="max" inputmode="decimal" value="' + e(x.max) + '"></div>' +
-          '<div class="field"><label>Umur perkiraan</label><input class="input" name="umur" value="' + e(x.umur) + '" placeholder="10–12 bln"></div></div>' +
-          (x.dariQdf ? '<span class="xs muted">Target awal diambil dari QDF Ternak; tersimpan tetap setelah Anda menekan Simpan.</span>' : '') +
-          (x.aman && x.min > x.aman ? '<span class="xs" style="color:#b3261e">Target ' + e(x.min) + ' kg melebihi perkiraan aman (' + x.aman + ' kg = bobot sekarang + kenaikan aman sampai timbang akhir). Pertimbangkan menurunkan.</span>' : '') +
-          (x.dariQdf ? '<span class="xs muted">Target awal diambil dari QDF Ternak; tersimpan tetap setelah Anda menekan Simpan.</span>' : '') +
-          (x.aman && x.min > x.aman ? '<span class="xs" style="color:#b3261e">Target ' + e(x.min) + ' kg melebihi perkiraan aman (' + x.aman + ' kg = bobot sekarang + kenaikan aman sampai timbang akhir). Pertimbangkan menurunkan.</span>' : '') +
-          '<div class="between"><label class="check"><input type="checkbox" name="tampil"' + (x.tampil ? ' checked' : '') + '> Tampil di web</label><button class="btn btn-dark btn-sm" type="submit">Simpan</button></div></form>';
-      }).join('') +
+      '<div class="card stack stok-tools"><div class="row"><input class="input" id="s-cari" type="search" placeholder="Cari eartag, mis. QD-025" autocomplete="off" aria-label="Cari eartag"><select class="input" id="s-filter" aria-label="Saring" style="max-width:150px"><option value="semua">Semua</option><option value="tampil">Sudah tampil</option><option value="belum">Belum tampil</option><option value="dipesan">Dipesan</option></select></div>' +
+      '<div class="between"><label class="check"><input type="checkbox" id="s-all"> Centang semua yang terlihat</label><span class="xs muted" id="s-count"></span></div></div>' +
+      '<div class="card stok-list" id="s-list">' + d.items.map(rowHtml).join('') + '</div>' +
+      '<p class="xs muted">Centang untuk menampilkan domba di web, ubah target bila perlu, lalu tekan <b>Simpan perubahan</b> sekali untuk semuanya. Bobot, foto, kandang &amp; status diambil otomatis dari QDF Ternak; target awal juga dari QDF Ternak. Domba berstatus Sakit tidak tampil. Tanda ⚠ berarti target melebihi perkiraan bobot aman.</p>' +
       '<form class="card stack" id="f-manual"><b class="h3">Pesan manual (pembeli via WhatsApp)</b><span class="xs muted">Memakai sistem tahan yang sama dengan web, jadi tidak bisa tabrakan. Pembeli menerima email berisi instruksi bayar &amp; bisa masuk dengan ID pesanan + nomor WA.</span>' +
       '<div class="field"><label for="m-tag">Domba</label><select class="input" id="m-tag" name="tag">' + d.items.filter(function (x) { return !x.pesanan && x.max; }).map(function (x) { return '<option value="' + e(x.tag) + '">' + e(x.tag) + ' · ' + x.min + '–' + x.max + ' kg' + (x.tampil ? '' : ' (tidak tampil)') + '</option>'; }).join('') + '</select></div>' +
       '<div class="grid-form"><div class="field"><label for="m-nama">Nama pembeli</label><input class="input" id="m-nama" name="nama" required></div><div class="field"><label for="m-wa">No. WhatsApp</label><input class="input" id="m-wa" name="wa" type="tel" required></div></div>' +
-      '<div class="field"><label for="m-email">Email pembeli</label><input class="input" id="m-email" name="email" type="email" required></div><button class="btn btn-primary" type="submit">Tahan domba &amp; kirim instruksi bayar</button></form></div>';
-    Array.prototype.forEach.call(document.querySelectorAll('form[data-i]'), function (f) {
-      f.onsubmit = function (ev) {
-        ev.preventDefault(); var x = d.items[Number(f.dataset.i)], dd = formData(f), btn = f.querySelector('[type=submit]'); busy(btn, true);
-        api('simpanStok', { tag: x.tag, ras: 'Tanduk', min: dd.min, max: dd.max, umur: dd.umur, tampil: !!dd.tampil }).then(function (res) { toast(x.tag + ' disimpan.'); drawStok(res); }).catch(function (er) { busy(btn, false); toast(er.message, true); });
-      };
-    });
+      '<div class="field"><label for="m-email">Email pembeli</label><input class="input" id="m-email" name="email" type="email" required></div><button class="btn btn-primary" type="submit">Tahan domba &amp; kirim instruksi bayar</button></form></div>' +
+      '<div class="stok-save" id="s-bar" hidden><span id="s-n"></span><button class="btn btn-primary btn-sm" id="s-save" type="button">Simpan perubahan</button></div>';
+    var list = qs('#s-list'), rows = Array.prototype.slice.call(list.querySelectorAll('.srow')), cari = qs('#s-cari'), fil = qs('#s-filter'), all = qs('#s-all'), bar = qs('#s-bar');
+    function cur(r) { return { min: qs('[name=min]', r).value.trim(), max: qs('[name=max]', r).value.trim(), umur: qs('[name=umur]', r).value.trim(), tampil: qs('[name=tampil]', r).checked }; }
+    var orig = rows.map(cur);
+    function dirtyRows() { return rows.filter(function (r) { return JSON.stringify(cur(r)) !== JSON.stringify(orig[Number(r.dataset.i)]); }); }
+    function refreshBar() {
+      var n = 0; rows.forEach(function (r) { var dd = JSON.stringify(cur(r)) !== JSON.stringify(orig[Number(r.dataset.i)]); r.classList.toggle('dirty', dd); if (dd) n++; });
+      bar.hidden = !n; qs('#s-n').textContent = n + ' domba diubah';
+    }
+    function apply() {
+      state.stokQ = cari.value; state.stokF = fil.value;
+      var q = norm(cari.value), f = fil.value, n = 0;
+      rows.forEach(function (r) {
+        var x = d.items[Number(r.dataset.i)];
+        var ok = (!q || norm(x.tag).indexOf(q) > -1) && (f === 'semua' || (f === 'tampil' && x.tampil && !x.pesanan) || (f === 'belum' && !x.tampil && !x.pesanan) || (f === 'dipesan' && !!x.pesanan));
+        r.hidden = !ok; if (ok) n++;
+      });
+      qs('#s-count').textContent = 'Terlihat ' + n + ' dari ' + rows.length;
+    }
+    cari.value = state.stokQ || ''; fil.value = state.stokF || 'semua';
+    cari.oninput = apply; fil.onchange = apply;
+    all.onchange = function () { rows.forEach(function (r) { if (!r.hidden) qs('[name=tampil]', r).checked = all.checked; }); refreshBar(); };
+    list.addEventListener('input', refreshBar); list.addEventListener('change', refreshBar);
+    apply(); refreshBar();
+    qs('#s-save').onclick = function () {
+      var ch = dirtyRows(), btn = this, bad = null;
+      ch.forEach(function (r) { var v = cur(r); if (!bad && v.tampil && (!v.min || !v.max)) bad = r; });
+      if (bad) { toast('Isi target min dan max dulu untuk ' + d.items[Number(bad.dataset.i)].tag + ' sebelum menampilkannya.', true); bad.scrollIntoView({ block: 'center' }); qs('[name=min]', bad).focus(); return; }
+      busy(btn, true);
+      var last = null, failTag = '', chain = Promise.resolve();
+      ch.forEach(function (r) {
+        chain = chain.then(function () {
+          var x = d.items[Number(r.dataset.i)], v = cur(r); failTag = x.tag;
+          return api('simpanStok', { tag: x.tag, ras: 'Tanduk', min: v.min, max: v.max, umur: v.umur, tampil: v.tampil }).then(function (res) { last = res; });
+        });
+      });
+      chain.then(function () { toast(ch.length + ' domba disimpan.'); drawStok(last); }).catch(function (er) { busy(btn, false); toast((failTag ? failTag + ': ' : '') + er.message, true); });
+    };
     var fm = document.getElementById('f-manual');
     fm.onsubmit = function (ev) {
       ev.preventDefault(); var dd = formData(fm), btn = fm.querySelector('[type=submit]'); busy(btn, true);

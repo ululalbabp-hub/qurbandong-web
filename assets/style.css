@@ -213,3 +213,24 @@ details.faq p { margin-top: 10px; color: var(--muted); font-size: 14px; }
 
 .chart svg { width: 100%; height: auto; }
 @media print { .site-header, .wa-float, .site-footer { display: none; } }
+
+/* admin: daftar stok domba */
+.stok-list { padding: 4px 0; }
+.srow { display: grid; grid-template-columns: auto 44px 1fr; gap: 8px 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.srow:last-child { border-bottom: 0; }
+.srow[hidden] { display: none; }
+.srow.dirty { background: var(--soft); box-shadow: inset 3px 0 0 var(--pumpkin); }
+.srow-chk { display: flex; align-items: center; justify-content: center; width: 30px; height: 44px; cursor: pointer; }
+.srow-chk input { width: 22px; height: 22px; accent-color: var(--hunter); }
+.srow-img { width: 44px; height: 44px; object-fit: cover; border-radius: 10px; }
+.srow-info { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.srow-warn { color: var(--danger); }
+.srow-in { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
+.srow-in .input { min-height: 38px; padding: 6px 8px; width: 64px; text-align: center; }
+.srow-in .srow-umur { flex: 1; width: auto; min-width: 70px; text-align: left; }
+@media (min-width: 760px) {
+  .srow { grid-template-columns: auto 44px minmax(180px, 1fr) auto; }
+  .srow-in { grid-column: auto; }
+}
+.stok-save { position: fixed; left: 50%; transform: translateX(-50%); bottom: 78px; z-index: 40; display: flex; align-items: center; gap: 14px; background: var(--jet); color: #fff; padding: 10px 12px 10px 18px; border-radius: 999px; box-shadow: 0 6px 24px rgba(0,0,0,.25); font-weight: 600; font-size: 14px; }
+.stok-save[hidden] { display: none; }
