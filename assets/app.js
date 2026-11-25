@@ -884,20 +884,22 @@
     var qs = function (sel, root) { return (root || document).querySelector(sel); };
     var norm = function (t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
     function rowHtml(x, i) {
-      var warn = x.aman && x.min > x.aman ? '<span class="srow-warn xs" title="Perkiraan bobot aman sampai timbang akhir: ' + x.aman + ' kg">⚠ target &gt; aman ' + x.aman + ' kg</span>' : '';
+      var sMin = x.aman ? Math.round(x.aman + 5) : 0, sMax = sMin + 2;
+      var warn = x.aman && x.min > x.aman + 5 ? '<span class="srow-warn xs" title="Perkiraan bobot aman sampai timbang akhir: ' + x.aman + ' kg">⚠ target &gt; aman ' + x.aman + ' kg + 5</span>' : '';
+      var sug = sMin ? '<button type="button" class="srow-sug xs" data-min="' + sMin + '" data-max="' + sMax + '" title="Perkiraan aman ' + x.aman + ' kg + 5 kg">Saran ' + sMin + '–' + sMax + ' kg · pakai</button>' : '';
       var chip = x.pesanan ? statusChip(x.pesanan.status === 'Ditahan' ? 'Ditahan' : x.pesanan.status) : (/^sehat$/i.test(x.status || 'Sehat') ? '' : '<span class="chip chip-grey">' + e(x.status) + '</span>');
       return '<div class="srow" data-i="' + i + '">' +
         '<label class="srow-chk" title="Tampil di web"><input type="checkbox" name="tampil"' + (x.tampil ? ' checked' : '') + ' aria-label="Tampil di web ' + e(x.tag) + '"></label>' +
         img(x.foto, x.tag, 'srow-img') +
         '<div class="srow-info"><div><b>' + e(x.tag) + '</b> <span class="xs muted">' + e(x.sex) + ' · ' + e(x.kandang) + '</span> ' + chip + '</div>' +
-        '<div class="xs muted">' + kg(x.bobot) + ' · timbang ' + tglPendek(x.tglTimbang) + (x.pesanan ? ' · <a href="#/admin/pesanan/' + e(x.pesanan.id) + '">' + e(x.pesanan.id) + '</a>' : '') + '</div>' + warn + '</div>' +
-        '<div class="srow-in"><input class="input" name="min" inputmode="decimal" value="' + e(x.min) + '" placeholder="min" aria-label="Target min ' + e(x.tag) + '"><span class="muted">–</span><input class="input" name="max" inputmode="decimal" value="' + e(x.max) + '" placeholder="max" aria-label="Target max ' + e(x.tag) + '"><input class="input srow-umur" name="umur" value="' + e(x.umur) + '" placeholder="Umur" aria-label="Umur ' + e(x.tag) + '"></div></div>';
+        '<div class="xs muted">' + kg(x.bobot) + ' · timbang ' + tglPendek(x.tglTimbang) + (x.pesanan ? ' · <a href="#/admin/pesanan/' + e(x.pesanan.id) + '">' + e(x.pesanan.id) + '</a>' : '') + '</div>' + warn + sug + '</div>' +
+        '<div class="srow-in"><input class="input" name="min" inputmode="decimal" value="' + e(x.min) + '" placeholder="' + (sMin || 'min') + '" aria-label="Target min ' + e(x.tag) + '"><span class="muted">–</span><input class="input" name="max" inputmode="decimal" value="' + e(x.max) + '" placeholder="' + (sMin ? sMax : 'max') + '" aria-label="Target max ' + e(x.tag) + '"><input class="input srow-umur" name="umur" value="' + e(x.umur) + '" placeholder="Umur" aria-label="Umur ' + e(x.tag) + '"></div></div>';
     }
     view.innerHTML = adminBar('stok') + '<div class="wrap stack mt"><div class="card small between"><span>Domba di QDF Ternak: <b>' + d.items.length + '</b></span><span>Tampil &amp; tersedia: <b>' + avail.length + '</b> · dipesan: <b>' + d.items.filter(function (x) { return x.pesanan; }).length + '</b></span></div>' +
       '<div class="card stack stok-tools"><div class="row"><input class="input" id="s-cari" type="search" placeholder="Cari eartag, mis. QD-025" autocomplete="off" aria-label="Cari eartag"><select class="input" id="s-filter" aria-label="Saring" style="max-width:150px"><option value="semua">Semua</option><option value="tampil">Sudah tampil</option><option value="belum">Belum tampil</option><option value="dipesan">Dipesan</option></select></div>' +
       '<div class="between"><label class="check"><input type="checkbox" id="s-all"> Centang semua yang terlihat</label><span class="xs muted" id="s-count"></span></div></div>' +
       '<div class="card stok-list" id="s-list">' + d.items.map(rowHtml).join('') + '</div>' +
-      '<p class="xs muted">Centang untuk menampilkan domba di web, ubah target bila perlu, lalu tekan <b>Simpan perubahan</b> sekali untuk semuanya. Bobot, foto, kandang &amp; status diambil otomatis dari QDF Ternak; target awal juga dari QDF Ternak. Domba berstatus Sakit tidak tampil. Tanda ⚠ berarti target melebihi perkiraan bobot aman.</p>' +
+      '<p class="xs muted">Centang untuk menampilkan domba di web, ubah target bila perlu, lalu tekan <b>Simpan perubahan</b> sekali untuk semuanya. Bobot, foto, kandang &amp; status diambil otomatis dari QDF Ternak; target awal juga dari QDF Ternak. Domba berstatus Sakit tidak tampil. Tombol <b>Saran</b> = perkiraan bobot aman sampai timbang akhir + 5 kg. Tanda ⚠ berarti target di atas saran itu.</p>' +
       '<form class="card stack" id="f-manual"><b class="h3">Pesan manual (pembeli via WhatsApp)</b><span class="xs muted">Memakai sistem tahan yang sama dengan web, jadi tidak bisa tabrakan. Pembeli menerima email berisi instruksi bayar &amp; bisa masuk dengan ID pesanan + nomor WA.</span>' +
       '<div class="field"><label for="m-tag">Domba</label><select class="input" id="m-tag" name="tag">' + d.items.filter(function (x) { return !x.pesanan && x.max; }).map(function (x) { return '<option value="' + e(x.tag) + '">' + e(x.tag) + ' · ' + x.min + '–' + x.max + ' kg' + (x.tampil ? '' : ' (tidak tampil)') + '</option>'; }).join('') + '</select></div>' +
       '<div class="grid-form"><div class="field"><label for="m-nama">Nama pembeli</label><input class="input" id="m-nama" name="nama" required></div><div class="field"><label for="m-wa">No. WhatsApp</label><input class="input" id="m-wa" name="wa" type="tel" required></div></div>' +
@@ -925,6 +927,10 @@
     cari.oninput = apply; fil.onchange = apply;
     all.onchange = function () { rows.forEach(function (r) { if (!r.hidden) qs('[name=tampil]', r).checked = all.checked; }); refreshBar(); };
     list.addEventListener('input', refreshBar); list.addEventListener('change', refreshBar);
+    list.addEventListener('click', function (ev) {
+      var b = ev.target.closest && ev.target.closest('.srow-sug'); if (!b) return;
+      var r = b.closest('.srow'); qs('[name=min]', r).value = b.dataset.min; qs('[name=max]', r).value = b.dataset.max; refreshBar();
+    });
     apply(); refreshBar();
     qs('#s-save').onclick = function () {
       var ch = dirtyRows(), btn = this, bad = null;
