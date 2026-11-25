@@ -266,7 +266,7 @@
         ['Bayarnya lewat apa? Bisa lihat ke kandang?', 'Pembayaran via Virtual Account atau transfer bank. Kandang di Gunung Wangun, Pamoyanan, Bogor terbuka untuk kunjungan setiap hari pukul 08.00–17.00.']
       ];
       var html = '<div class="wrap">' +
-        '<section class="hero mt">' + '<img src="' + IMG + 'domba-hero.jpg" class="hero-foto" alt="Domba di kandang Qurbandong Farm">' +
+        '<section class="hero hero-split mt">' + '<img src="' + IMG + 'domba-hero.jpg" class="hero-foto" alt="Domba di kandang Qurbandong Farm">' +
         '<div class="hero-inner"><span class="chip">Qurban Iduladha ' + e((c.iduladha || '').slice(0, 4)) + ' · Bogor</span>' +
         '<h1 class="h1">Pilih sendiri dombanya. Pantau sampai hari H.</h1><p>Bukan "domba sesuai foto" — domba asli bereartag, ditimbang tiap bulan.</p>' +
         '<div class="wrap-row"><a class="btn btn-primary" href="#/katalog">Pilih domba qurban</a><a class="btn btn-outline" href="#/nabung">Nabung qurban</a></div></div></section>' +
@@ -274,7 +274,7 @@
         '<section class="stats mt"><div class="card"><b>' + c.dpPersen + '%</b><span class="small">DP saja, sisanya bisa dicicil</span></div><div class="card"><b>Gratis</b><span class="small">ongkir se-Jabodetabek</span></div>' +
         '<div class="card"><b>' + c.maksGanti + '×</b><span class="small">ganti domba, tanpa biaya</span></div><div class="card"><b>1×/bln</b><span class="small">update bobot &amp; foto</span></div></section>' +
 
-        '<section class="section split"><div class="hero" style="min-height:340px"><img src="' + IMG + 'domba-4.jpg" alt="Domba qurban di kandang"><div class="hero-inner"><span class="eyebrow" style="color:var(--cream)">Rasakan qurbannya</span><h2 class="h2">Kenali hewan qurbanmu, sejak hari pertama.</h2></div></div>' +
+        '<section class="section split"><div class="hero" style="min-height:340px"><img src="' + IMG + 'domba-kandang.jpg" style="object-position:50% 72%" alt="Domba qurban di kandang"><div class="hero-inner"><span class="eyebrow" style="color:var(--cream)">Rasakan qurbannya</span><h2 class="h2">Kenali hewan qurbanmu, sejak hari pertama.</h2></div></div>' +
         '<div class="card stack-lg"><p>Qurban bukan sekadar membeli hewan di hari terakhir. Di Qurbandong, Anda memilih sendiri dombanya, melihatnya tumbuh dari bulan ke bulan, dan di hari H Anda tahu persis siapa yang Anda qurbankan.</p>' +
         [['search', 'Pilih & kenali', 'Lihat foto aslinya, nomor eartag, jenis, dan umurnya.'], ['pen', 'Beri nama panggilan', 'Si Jalu, Si Gagah — nama pilihan keluarga tampil di halaman Domba Saya.'], ['chart', 'Lihat ia tumbuh', 'Bobot, foto, dan catatan kesehatan diperbarui tiap bulan.'], ['people', 'Kunjungi bersama keluarga', 'Ajak anak bertemu dombanya di kandang kaki Gunung Wangun.']].map(function (x) {
           return '<div class="row" style="align-items:flex-start"><span style="flex:none;width:36px;height:36px;border-radius:999px;background:var(--cream);display:flex;align-items:center;justify-content:center">' + icon(x[0], 18, '#8A4A14') + '</span><span><b>' + x[1] + '</b><br><span class="small muted">' + x[2] + '</span></span></div>';
