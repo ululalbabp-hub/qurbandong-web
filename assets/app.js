@@ -879,6 +879,8 @@
     if (needAdmin()) return Promise.resolve();
     return api('adminStok', {}).then(function (d) { drawStok(d); });
   }
+  var SARAN_TAMBAH = 2, SARAN_RENTANG = 5; /* saran target: bobot aman + 2 kg; batas atas = target + 5 kg */
+  function saran(x) { return x.aman ? { min: x.aman + SARAN_TAMBAH, max: x.aman + SARAN_TAMBAH + SARAN_RENTANG } : null; }
   function drawStok(d) {
     var avail = d.items.filter(function (x) { return x.tampil && !x.pesanan; });
     var qs = function (sel, root) { return (root || document).querySelector(sel); };
@@ -887,17 +889,20 @@
       var sMin = x.aman ? Math.round(x.aman + 5) : 0, sMax = sMin + 2;
       var warn = x.aman && x.min > x.aman + 5 ? '<span class="srow-warn xs" title="Perkiraan bobot aman sampai timbang akhir: ' + x.aman + ' kg">⚠ target &gt; aman ' + x.aman + ' kg + 5</span>' : '';
       var sug = sMin ? '<button type="button" class="srow-sug xs" data-min="' + sMin + '" data-max="' + sMax + '" title="Perkiraan aman ' + x.aman + ' kg + 5 kg">Saran ' + sMin + '–' + sMax + ' kg · pakai</button>' : '';
+      var sg = saran(x);
+      var sgBtn = sg ? '<button type="button" class="srow-saran xs" data-saran="' + sg.min + '-' + sg.max + '" title="Bobot aman ' + x.aman + ' kg + ' + SARAN_TAMBAH + ' kg, batas atas + ' + SARAN_RENTANG + ' kg">Saran ' + sg.min + '–' + sg.max + ' kg</button>' : '';
       var chip = x.pesanan ? statusChip(x.pesanan.status === 'Ditahan' ? 'Ditahan' : x.pesanan.status) : (/^sehat$/i.test(x.status || 'Sehat') ? '' : '<span class="chip chip-grey">' + e(x.status) + '</span>');
       return '<div class="srow" data-i="' + i + '">' +
         '<label class="srow-chk" title="Tampil di web"><input type="checkbox" name="tampil"' + (x.tampil ? ' checked' : '') + ' aria-label="Tampil di web ' + e(x.tag) + '"></label>' +
         img(x.foto, x.tag, 'srow-img') +
         '<div class="srow-info"><div><b>' + e(x.tag) + '</b> <span class="xs muted">' + e(x.sex) + ' · ' + e(x.kandang) + '</span> ' + chip + '</div>' +
-        '<div class="xs muted">' + kg(x.bobot) + ' · timbang ' + tglPendek(x.tglTimbang) + (x.pesanan ? ' · <a href="#/admin/pesanan/' + e(x.pesanan.id) + '">' + e(x.pesanan.id) + '</a>' : '') + '</div>' + warn + sug + '</div>' +
+        '<div class="xs muted">' + kg(x.bobot) + ' · timbang ' + tglPendek(x.tglTimbang) + (x.pesanan ? ' · <a href="#/admin/pesanan/' + e(x.pesanan.id) + '">' + e(x.pesanan.id) + '</a>' : '') + '</div>' + warn + sgBtn + '</div>' +
         '<div class="srow-in"><input class="input" name="min" inputmode="decimal" value="' + e(x.min) + '" placeholder="' + (sMin || 'min') + '" aria-label="Target min ' + e(x.tag) + '"><span class="muted">–</span><input class="input" name="max" inputmode="decimal" value="' + e(x.max) + '" placeholder="' + (sMin ? sMax : 'max') + '" aria-label="Target max ' + e(x.tag) + '"><input class="input srow-umur" name="umur" value="' + e(x.umur) + '" placeholder="Umur" aria-label="Umur ' + e(x.tag) + '"></div></div>';
     }
     view.innerHTML = adminBar('stok') + '<div class="wrap stack mt"><div class="card small between"><span>Domba di QDF Ternak: <b>' + d.items.length + '</b></span><span>Tampil &amp; tersedia: <b>' + avail.length + '</b> · dipesan: <b>' + d.items.filter(function (x) { return x.pesanan; }).length + '</b></span></div>' +
       '<div class="card stack stok-tools"><div class="row"><input class="input" id="s-cari" type="search" placeholder="Cari eartag, mis. QD-025" autocomplete="off" aria-label="Cari eartag"><select class="input" id="s-filter" aria-label="Saring" style="max-width:150px"><option value="semua">Semua</option><option value="tampil">Sudah tampil</option><option value="belum">Belum tampil</option><option value="dipesan">Dipesan</option></select></div>' +
-      '<div class="between"><label class="check"><input type="checkbox" id="s-all"> Centang semua yang terlihat</label><span class="xs muted" id="s-count"></span></div></div>' +
+      '<div class="between"><label class="check"><input type="checkbox" id="s-all"> Centang semua yang terlihat</label><span class="xs muted" id="s-count"></span></div>' +
+      '<div class="between"><button type="button" class="btn btn-outline btn-sm" id="s-saran">Isi saran target (yang terlihat)</button><span class="xs muted">Saran = bobot aman + 2 kg, batas atas + 5 kg</span></div></div>' +
       '<div class="card stok-list" id="s-list">' + d.items.map(rowHtml).join('') + '</div>' +
       '<p class="xs muted">Centang untuk menampilkan domba di web, ubah target bila perlu, lalu tekan <b>Simpan perubahan</b> sekali untuk semuanya. Bobot, foto, kandang &amp; status diambil otomatis dari QDF Ternak; target awal juga dari QDF Ternak. Domba berstatus Sakit tidak tampil. Tombol <b>Saran</b> = perkiraan bobot aman sampai timbang akhir + 5 kg. Tanda ⚠ berarti target di atas saran itu.</p>' +
       '<form class="card stack" id="f-manual"><b class="h3">Pesan manual (pembeli via WhatsApp)</b><span class="xs muted">Memakai sistem tahan yang sama dengan web, jadi tidak bisa tabrakan. Pembeli menerima email berisi instruksi bayar &amp; bisa masuk dengan ID pesanan + nomor WA.</span>' +
@@ -926,6 +931,18 @@
     cari.value = state.stokQ || ''; fil.value = state.stokF || 'semua';
     cari.oninput = apply; fil.onchange = apply;
     all.onchange = function () { rows.forEach(function (r) { if (!r.hidden) qs('[name=tampil]', r).checked = all.checked; }); refreshBar(); };
+    function isiSaran(r) {
+      var x = d.items[Number(r.dataset.i)], sg = saran(x); if (!sg) return false;
+      qs('[name=min]', r).value = sg.min; qs('[name=max]', r).value = sg.max; return true;
+    }
+    list.addEventListener('click', function (ev) {
+      var b = ev.target.closest && ev.target.closest('.srow-saran'); if (!b) return;
+      isiSaran(b.closest('.srow')); refreshBar();
+    });
+    qs('#s-saran').onclick = function () {
+      var n = 0; rows.forEach(function (r) { if (!r.hidden && isiSaran(r)) n++; });
+      refreshBar(); toast(n ? 'Saran terisi di ' + n + ' domba. Tekan Simpan perubahan untuk menyimpan.' : 'Tidak ada domba terlihat yang punya perkiraan bobot.');
+    };
     list.addEventListener('input', refreshBar); list.addEventListener('change', refreshBar);
     list.addEventListener('click', function (ev) {
       var b = ev.target.closest && ev.target.closest('.srow-sug'); if (!b) return;
