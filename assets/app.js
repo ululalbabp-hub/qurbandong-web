@@ -22,7 +22,7 @@
   function store(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (x) { } }
   function load(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (x) { return null; } }
   function loadSesi() { return load('qb_sesi'); }
-  function setSesi(s) { state.sesi = s; store('qb_sesi', s); renderHeader(); }
+  function setSesi(s) { state.sesi = s; store('qb_sesi', s); if (typeof clearC === 'function') clearC(); renderHeader(); }
   function img(src, alt, cls) { return '<img src="' + e(src || FALLBACK) + '" alt="' + e(alt || '') + '"' + (cls ? ' class="' + cls + '"' : '') + ' loading="lazy" onerror="this.onerror=null;this.src=\'' + FALLBACK + '\'">'; }
   function toast(msg, isErr) {
     var t = document.createElement('div'); t.className = 'toast' + (isErr ? ' err-toast' : ''); t.setAttribute('role', 'status'); t.textContent = msg;
@@ -68,9 +68,85 @@
           if (j.code === 'AUTH' && state.sesi && /masuk terlebih|Khusus admin/.test(j.error || '')) { setSesi(null); }
           throw err;
         }
+        if (!BACA[action]) clearC();
         return j.data;
       }, function (x) { if (x && x.code) throw x; throw new Error('Tidak bisa terhubung ke server. Periksa koneksi internet Anda.'); });
   }
+  /* ---------------- data cepat ----------------
+   * Halaman yang pernah dibuka tampil seketika dari salinan terakhir, lalu diperbarui diam-diam
+   * di belakang layar. Katalog & detail domba disimpan di browser (maks 6 jam), data pribadi/admin
+   * hanya di memori tab. Setiap aksi yang mengubah data membuang salinan agar tidak ada data lama. */
+  var BACA = { config: 1, katalog: 1, domba: 1, saya: 1, pesanan: 1, adminRingkas: 1, adminPesanan: 1, adminDetail: 1, adminStok: 1, adminHarga: 1 };
+  var PUBLIK = { katalog: 1, domba: 1 }, MAKS_UMUR = 6 * 3600 * 1000, SEGAR_MS = 4000;
+  var mem = {}, jalan = {};
+  function ckey(a, p) { return a + ':' + JSON.stringify(p || {}); }
+  function getC(k, publik) {
+    if (mem[k]) return mem[k];
+    if (publik) { var v = load('qbc_' + k); if (v && v.t && Date.now() - v.t < MAKS_UMUR) { mem[k] = v; return v; } }
+    return null;
+  }
+  function putC(a, p, d) { var k = ckey(a, p), v = { t: Date.now(), d: d }; mem[k] = v; if (PUBLIK[a]) store('qbc_' + k, v); }
+  function clearC() {
+    mem = {}; jalan = {};
+    try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf('qbc_') === 0) localStorage.removeItem(k); }); } catch (x) { }
+  }
+  function ambil(a, p) {
+    var k = ckey(a, p); if (jalan[k]) return jalan[k];
+    var pr = api(a, p).then(function (d) { delete jalan[k]; putC(a, p, d); return d; }, function (x) { delete jalan[k]; throw x; });
+    jalan[k] = pr; return pr;
+  }
+  /* Pengguna sedang mengetik/mengubah isian? Jangan ganti tampilan di bawah tangannya. */
+  function sedangIsi() {
+    var a = document.activeElement;
+    if (a && view.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox' && a.type !== 'radio' && !a.dataset.bebas) return true;
+    return Array.prototype.some.call(view.querySelectorAll('input,textarea,select'), function (el) {
+      if (el.dataset.bebas) return false;
+      if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+      if (el.tagName === 'SELECT') return Array.prototype.some.call(el.options, function (o) { return o.selected !== o.defaultSelected; });
+      return el.value !== el.defaultValue;
+    });
+  }
+  function data(a, p) {
+    var k = ckey(a, p), c = getC(k, PUBLIK[a]);
+    if (c) {
+      if (Date.now() - c.t > SEGAR_MS) {
+        var h = location.hash, lama = JSON.stringify(c.d);
+        ambil(a, p).then(function (d) { if (JSON.stringify(d) !== lama && location.hash === h && !sedangIsi()) route(true); }).catch(function () { });
+      }
+      return Promise.resolve(c.d);
+    }
+    return ambil(a, p);
+  }
+  function prefetch(a, p) {
+    if (!API) return;
+    var c = getC(ckey(a, p), PUBLIK[a]);
+    if (c && Date.now() - c.t < 30000) return;
+    ambil(a, p).catch(function () { });
+  }
+  /* Ambil lebih dulu data halaman tujuan saat kursor/jari menyentuh tautan. */
+  function prefetchHash(h) {
+    var m;
+    if (h === '#/katalog') return prefetch('katalog');
+    if ((m = h.match(/^#\/(?:domba|pesan)\/([^/?]+)$/))) return prefetch('domba', { tag: decodeURIComponent(m[1]) });
+    if (!state.sesi) return;
+    if (h === '#/saya') return prefetch('saya');
+    if ((m = h.match(/^#\/pesanan\/([^/?]+)/))) return prefetch('pesanan', { id: decodeURIComponent(m[1]) });
+    if (state.sesi.peran !== 'admin') return;
+    if (h === '#/admin' || h === '#/admin/pesanan') return prefetch('adminPesanan', { filter: 'tindakan', q: '' });
+    if (h === '#/admin/stok') return prefetch('adminStok', {});
+    if (h === '#/admin/harga') return prefetch('adminHarga', {});
+    if ((m = h.match(/^#\/admin\/pesanan\/([^/?]+)$/))) return prefetch('adminDetail', { id: decodeURIComponent(m[1]) });
+  }
+  function onIntent(ev) {
+    var a = ev.target && ev.target.closest && ev.target.closest('a[href^="#/"]');
+    if (a) prefetchHash(a.getAttribute('href'));
+  }
+  document.addEventListener('pointerover', onIntent, { passive: true });
+  document.addEventListener('touchstart', onIntent, { passive: true });
+  document.addEventListener('focusin', onIntent);
+  /* Ukuran foto Drive sesuai tempat tampilnya (foto kecil = jauh lebih cepat). */
+  function th(url, w) { return url ? String(url).replace(/([?&]sz=)w\d+/, '$1w' + w) : url; }
+
   function cfg() {
     if (state.cfg) return Promise.resolve(state.cfg);
     var cached = load('qb_cfg');
@@ -156,7 +232,7 @@
     return '<ol class="stack small" style="padding-left:20px;margin:0">' + skItems(c).map(function (s) { return '<li><b>' + e(s[0]) + '</b> ' + e(s[1]) + '</li>'; }).join('') + '</ol>';
   }
   function sheepCard(d) {
-    return '<a class="sheep" href="#/domba/' + encodeURIComponent(d.tag) + '"><div class="ph">' + img(d.foto, 'Foto domba ' + d.tag) + statusChip(d.status) + '</div><div class="body">' +
+    return '<a class="sheep" href="#/domba/' + encodeURIComponent(d.tag) + '"><div class="ph">' + img(th(d.foto, 600), 'Foto domba ' + d.tag) + statusChip(d.status) + '</div><div class="body">' +
       '<span class="xs muted bold">' + e(d.tag) + '</span><span class="bold">Target ' + d.min + '–' + d.max + ' kg</span>' +
       '<span class="xs">Sekarang ' + kg(d.bobot) + (d.naikBulan ? ' · +' + kg(d.naikBulan) + '/bln' : '') + '</span>' +
       (d.umur ? '<span class="xs muted">' + e(d.sex || 'Jantan') + ' · umur ± ' + e(d.umur) + '</span>' : '') +
@@ -249,7 +325,7 @@
         '<section class="section stack"><span class="eyebrow">Pertanyaan umum</span><h2 class="h2">Yang sering ditanyakan</h2>' +
         faq.map(function (f) { return '<details class="faq"><summary>' + e(f[0]) + '</summary><p>' + e(f[1]) + '</p></details>'; }).join('') + '</section></div>';
       view.innerHTML = html;
-      api('katalog').then(function (k) {
+      data('katalog').then(function (k) {
         var el = document.getElementById('home-katalog'); if (!el) return;
         var items = k.items.slice(0, 4);
         el.innerHTML = items.length ? items.map(sheepCard).join('') : '<div class="empty" style="grid-column:1/-1">Stok batch berikutnya segera hadir. <a href="#/nabung">Mulai nabung dulu →</a></div>';
@@ -258,7 +334,7 @@
   }
 
   function pageKatalog() {
-    return Promise.all([cfg(), api('katalog')]).then(function (r) {
+    return Promise.all([cfg(), data('katalog')]).then(function (r) {
       var c = r[0], items = r[1].items, f = load('qb_filter') || { rentang: '' };
       function draw() {
         var list = items.filter(function (d) {
@@ -273,7 +349,7 @@
         '<div class="card between small"><span>Harga ' + e(tgl(c.harga.mulai).replace(/^\d+ /, '')) + '</span><span><b class="accent">Domba Tanduk ' + rp(c.harga.tanduk) + '/kg</b> · DP ' + c.dpPersen + '%</span></div>' +
         ((c.hargaJadwal && c.hargaJadwal[0]) ? '<div class="card-cream small"><b>Harga naik jadi ' + rp(c.hargaJadwal[0].harga) + '/kg mulai ' + e(tgl(c.hargaJadwal[0].mulai)) + '.</b> Akad lebih awal, harga per kg terkunci di harga hari ini.</div>' : '') +
         '<div class="wrap-row" role="group" aria-label="Filter bobot">' +
-        '<label class="sr-only" for="f-rentang">Target bobot</label><select id="f-rentang" class="input" style="width:auto;padding:8px 12px;font-size:14px">' + ranges.map(function (x) { return '<option value="' + x + '"' + (f.rentang === x ? ' selected' : '') + '>' + (x ? x.replace('-', '–') + ' kg' : 'Semua bobot') + '</option>'; }).join('') + '</select></div>' +
+        '<label class="sr-only" for="f-rentang">Target bobot</label><select id="f-rentang" data-bebas="1" class="input" style="width:auto;padding:8px 12px;font-size:14px">' + ranges.map(function (x) { return '<option value="' + x + '"' + (f.rentang === x ? ' selected' : '') + '>' + (x ? x.replace('-', '–') + ' kg' : 'Semua bobot') + '</option>'; }).join('') + '</select></div>' +
         '<span class="small muted" id="kat-count"></span><div class="grid" id="kat-grid"></div>' +
         '<a class="card-cream stack" style="text-decoration:none;color:inherit" href="#/nabung"><b>Mau bobot lain yang belum ada?</b><span class="small">Nabung dulu sekarang, pilih dombanya saat batch dengan bobot itu sudah siap di kandang.</span><b class="small accent">Mulai nabung qurban →</b></a>' +
         '<p class="xs muted">Harga akhir = bobot riil saat timbang akhir × harga/kg, maksimal batas atas target. Lebih dari target = bonus. Gratis ongkir Jabodetabek.</p></div>';
@@ -283,12 +359,12 @@
   }
 
   function pageDomba(tag) {
-    return Promise.all([cfg(), api('domba', { tag: tag })]).then(function (r) {
+    return Promise.all([cfg(), data('domba', { tag: tag })]).then(function (r) {
       var c = r[0], d = r[1];
       var media = (d.media || []).length ? d.media : [{ foto: d.foto, t: d.tglTimbang }];
       view.innerHTML = '<div class="wrap">' + backBar('#/katalog', d.tag + ' · Domba Tanduk', 'Target ' + d.min + '–' + d.max + ' kg') +
         '<div class="split mt"><div class="gallery"><div class="main">' + img(media[0].foto, 'Foto domba ' + d.tag).replace('<img', '<img id="g-main"') + '</div>' +
-        (media.length > 1 ? '<div class="thumbs">' + media.map(function (m, i) { return '<button aria-label="Foto ' + tgl(m.t) + '" aria-current="' + (i === 0) + '" data-src="' + e(m.foto) + '">' + img(m.foto, '') + '</button>'; }).join('') + '</div>' : '') +
+        (media.length > 1 ? '<div class="thumbs">' + media.map(function (m, i) { return '<button aria-label="Foto ' + tgl(m.t) + '" aria-current="' + (i === 0) + '" data-src="' + e(m.foto) + '">' + img(th(m.foto, 200), '') + '</button>'; }).join('') + '</div>' : '') +
         '<span class="xs muted">Foto ' + tgl(media[0].t) + ' · diperbarui tiap bulan</span></div>' +
         '<div class="stack">' + statusChip(d.status) + '<span class="small muted bold">Eartag ' + e(d.tag) + ' · Domba Tanduk · ' + e(d.sex || 'Jantan') + (d.umur ? ' · umur ± ' + e(d.umur) : '') + '</span>' +
         '<h1 class="h1" style="font-size:30px">Target ' + d.min + '–' + d.max + ' kg</h1><span class="chip chip-ok" style="align-self:flex-start">Memenuhi syarat sah qurban</span>' +
@@ -315,7 +391,7 @@
   }
 
   function pageDiambil(tag, judul) {
-    return api('katalog').then(function (k) {
+    return data('katalog').then(function (k) {
       var items = k.items.filter(function (x) { return x.status === 'Tersedia'; }).slice(0, 4);
       view.innerHTML = '<div class="wrap narrow stack mt-lg"><div class="card stack center"><span style="margin:auto;width:56px;height:56px;border-radius:999px;background:var(--pumpkin);display:flex;align-items:center;justify-content:center">' + icon('clock', 28, '#2A2D2B') + '</span>' +
         '<h1 class="h3">' + e(judul || ('Maaf, ' + tag + ' baru saja dipesan orang lain')) + '</h1><p class="muted">Domba yang sedang ditahan akan kembali tersedia jika pemesannya tidak membayar dalam batas waktu.</p></div>' +
@@ -388,7 +464,7 @@
   }
 
   function pagePesan(tag) {
-    return Promise.all([cfg(), api('domba', { tag: tag })]).then(function (r) {
+    return Promise.all([cfg(), data('domba', { tag: tag })]).then(function (r) {
       var c = r[0], d = r[1];
       if (d.status !== 'Tersedia') return pageDiambil(tag);
       var head = '<div class="card row">' + img(d.foto, d.tag).replace('<img', '<img style="width:64px;height:64px;border-radius:12px;object-fit:cover;flex:none"') +
@@ -457,7 +533,7 @@
         if (fl) {
           fl.onsubmit = function (ev) {
             ev.preventDefault(); var d = formData(fl), btn = fl.querySelector('[type=submit]'); busy(btn, true);
-            api('login', { id: d.id, password: d.password, ingat: !!d.ingat }).then(function (s) { setSesi(s); go(s.peran === 'admin' && lanjut === '#/saya' ? '#/admin' : lanjut); })
+            api('login', { id: d.id, password: d.password, ingat: !!d.ingat }).then(function (s) { setSesi(s); if (s.peran === 'admin') { prefetch('adminPesanan', { filter: 'tindakan', q: '' }); prefetch('adminStok', {}); } go(s.peran === 'admin' && lanjut === '#/saya' ? '#/admin' : lanjut); })
               .catch(function (x) { busy(btn, false); document.getElementById('l-err').textContent = x.message; });
           };
           document.getElementById('lupa').onclick = function () {
@@ -502,7 +578,7 @@
 
   function pageSaya() {
     if (needLogin()) return Promise.resolve();
-    return Promise.all([cfg(), api('saya')]).then(function (r) {
+    return Promise.all([cfg(), data('saya')]).then(function (r) {
       var d = r[1];
       if (d.lingkup && d.lingkup !== 'all' && d.pesanan.length === 1) return go('#/pesanan/' + d.pesanan[0].id);
       view.innerHTML = '<div class="wrap narrow stack mt-lg"><div class="between"><h1 class="h2">Assalamu\'alaikum, ' + e((d.nama || '').split(' ')[0]) + '</h1><button class="btn btn-ghost" id="out">Keluar</button></div>' +
@@ -539,7 +615,7 @@
   }
   function pagePesanan(id) {
     if (needLogin()) return Promise.resolve();
-    return Promise.all([cfg(), api('pesanan', { id: id })]).then(function (r) {
+    return Promise.all([cfg(), data('pesanan', { id: id })]).then(function (r) {
       var c = r[0], o = r[1], d = o.domba || {}, full = o.lingkup === 'all';
       var head = '<div class="card row" style="gap:14px">' + img(d.foto, 'Domba ' + o.tag).replace('<img', '<img style="width:92px;height:92px;border-radius:14px;object-fit:cover;flex:none"') +
         '<div class="stack" style="gap:3px">' +
@@ -645,7 +721,7 @@
 
   function pageGanti(id, mode) {
     if (needLogin()) return Promise.resolve();
-    return Promise.all([cfg(), api('pesanan', { id: id })]).then(function (r) {
+    return Promise.all([cfg(), data('pesanan', { id: id })]).then(function (r) {
       var c = r[0], o = r[1], pilih = mode === 'pilih';
       var list = pilih ? (o.pilihan || []) : (o.pengganti || []);
       if (!pilih && !o.boleh.ganti) { view.innerHTML = '<div class="wrap narrow">' + backBar('#/pesanan/' + o.id, 'Ganti domba', o.id) + '<div class="card">Kesempatan ganti domba sudah habis atau sudah lewat batas H-' + c.h.ganti + '.</div></div>'; return; }
@@ -679,7 +755,7 @@
 
   function pageTagihan(id) {
     if (needLogin()) return Promise.resolve();
-    return Promise.all([cfg(), api('pesanan', { id: id })]).then(function (r) {
+    return Promise.all([cfg(), data('pesanan', { id: id })]).then(function (r) {
       var c = r[0], o = r[1], h = o.hitung, d = o.domba || {};
       var bukti = (d.media || [])[0];
       var tl = [
@@ -717,7 +793,7 @@
 
   function pageKirim(id) {
     if (needLogin()) return Promise.resolve();
-    return Promise.all([cfg(), api('pesanan', { id: id })]).then(function (r) {
+    return Promise.all([cfg(), data('pesanan', { id: id })]).then(function (r) {
       var c = r[0], o = r[1], full = o.lingkup === 'all', sembelih = o.layanan === 'Sembelih';
       var st = o.statusKirim || '';
       var steps = [['Timbang akhir', o.bobotAkhir ? 'H-' + c.h.timbang + ' · ' + kg(o.bobotAkhir) : 'H-' + c.h.timbang + ' Iduladha', o.bobotAkhir ? 'done' : 'next'],
@@ -751,7 +827,7 @@
 
   function pageBatal(id) {
     if (needLogin()) return Promise.resolve();
-    return Promise.all([cfg(), api('pesanan', { id: id })]).then(function (r) {
+    return Promise.all([cfg(), data('pesanan', { id: id })]).then(function (r) {
       var c = r[0], o = r[1], b = o.batalEstimasi || { hari: 0, potongan: 0, refund: o.hitung.paid, biayaHarian: c.biayaHarian, penuh: true };
       if (!o.boleh.batal) { view.innerHTML = '<div class="wrap narrow">' + backBar('#/pesanan/' + o.id, 'Batalkan pesanan', o.id) + '<div class="card">Pesanan ini tidak bisa dibatalkan dari web. Hubungi admin.</div></div>'; return; }
       view.innerHTML = '<div class="wrap narrow stack">' + backBar('#/pesanan/' + o.id, 'Batalkan pesanan', o.id) +
@@ -799,6 +875,11 @@
 
   /* ================= ADMIN ================= */
   function adminBar(active) {
+    setTimeout(function () { /* halaman admin lain disiapkan lebih dulu supaya pindah tab terasa instan */
+      if (active !== 'pesanan') prefetch('adminPesanan', { filter: 'tindakan', q: '' });
+      if (active !== 'stok') prefetch('adminStok', {});
+      if (active !== 'harga') prefetch('adminHarga', {});
+    }, 400);
     return '<div class="admin-bar"><div class="wrap"><b style="color:var(--pumpkin);margin-right:8px">ADMIN</b>' +
       [['pesanan', 'Pesanan'], ['stok', 'Stok domba'], ['harga', 'Harga & pengaturan']].map(function (x) { return '<a href="#/admin/' + x[0] + '" class="' + (active === x[0] ? 'active' : '') + '">' + x[1] + '</a>'; }).join('') + '</div></div>';
   }
@@ -810,7 +891,7 @@
   function pageAdminPesanan(q) {
     if (needAdmin()) return Promise.resolve();
     var f = (q && q.f) || 'tindakan', s = (q && q.q) || '';
-    return api('adminPesanan', { filter: f === 'semua' ? '' : f, q: s }).then(function (d) {
+    return data('adminPesanan', { filter: f === 'semua' ? '' : f, q: s }).then(function (d) {
       var rk = d.ringkas;
       view.innerHTML = adminBar('pesanan') + '<div class="wrap stack mt">' +
         '<div class="stats"><div class="card"><span class="xs muted">Pesanan aktif</span><b style="color:var(--jet)">' + rk.aktif + '</b></div><div class="card"><span class="xs muted">Dana masuk</span><b style="color:var(--jet)">' + jt(rk.dana) + '</b></div><div class="card-cream"><span class="xs">Perlu tindakan</span><b style="font-size:28px">' + rk.tindak + '</b></div><div class="card"><span class="xs muted">Data kirim belum lengkap</span><b style="color:var(--jet)">' + rk.belumLengkap + '</b></div></div>' +
@@ -828,7 +909,7 @@
   }
   function pageAdminDetail(id) {
     if (needAdmin()) return Promise.resolve();
-    return Promise.all([cfg(), api('adminDetail', { id: id })]).then(function (r) { drawAdminDetail(r[0], r[1]); });
+    return Promise.all([cfg(), data('adminDetail', { id: id })]).then(function (r) { drawAdminDetail(r[0], r[1]); });
   }
   function drawAdminDetail(c, o) {
     var h = o.hitung, d = o.domba || {}, bh = o.batalHitung || {};
@@ -865,7 +946,7 @@
         ev.preventDefault(); var dd = formData(f), btn = f.querySelector('[type=submit]');
         if (confirmMsg && !window.confirm(confirmMsg)) return;
         busy(btn, true);
-        api(action, Object.assign({ id: o.id }, build(dd))).then(function (res) { toast('Tersimpan.'); drawAdminDetail(c, res); window.scrollTo(0, 0); }).catch(function (x) { busy(btn, false); toast(x.message, true); });
+        api(action, Object.assign({ id: o.id }, build(dd))).then(function (res) { toast('Tersimpan.'); putC('adminDetail', { id: o.id }, res); drawAdminDetail(c, res); window.scrollTo(0, 0); }).catch(function (x) { busy(btn, false); toast(x.message, true); });
       };
     }
     act('f-bayar', 'catatBayar', function (dd) { return { jumlah: Number(String(dd.jumlah).replace(/\D/g, '')), metode: dd.metode, referensi: dd.referensi }; });
@@ -877,7 +958,7 @@
 
   function pageAdminStok() {
     if (needAdmin()) return Promise.resolve();
-    return api('adminStok', {}).then(function (d) { drawStok(d); });
+    return data('adminStok', {}).then(function (d) { drawStok(d); });
   }
   var SARAN_UMUR = '14 bulan'; /* saran umur perkiraan bila belum diisi */
   var SARAN_TAMBAH = 2, SARAN_RENTANG = 5; /* saran target: bobot aman + 2 kg; batas atas = target + 5 kg */
@@ -892,13 +973,13 @@
       var chip = x.pesanan ? statusChip(x.pesanan.status === 'Ditahan' ? 'Ditahan' : x.pesanan.status) : (/^sehat$/i.test(x.status || 'Sehat') ? '' : '<span class="chip chip-grey">' + e(x.status) + '</span>');
       return '<div class="srow" data-i="' + i + '">' +
         '<label class="srow-chk" title="Tampil di web"><input type="checkbox" name="tampil"' + (x.tampil ? ' checked' : '') + ' aria-label="Tampil di web ' + e(x.tag) + '"></label>' +
-        img(x.foto, x.tag, 'srow-img') +
+        img(th(x.foto, 120), x.tag, 'srow-img') +
         '<div class="srow-info"><div><b>' + e(x.tag) + '</b> <span class="xs muted">' + e(x.sex) + ' · ' + e(x.kandang) + '</span> ' + chip + '</div>' +
         '<div class="xs muted">' + kg(x.bobot) + ' · timbang ' + tglPendek(x.tglTimbang) + (x.pesanan ? ' · <a href="#/admin/pesanan/' + e(x.pesanan.id) + '">' + e(x.pesanan.id) + '</a>' : '') + '</div>' + warn + '</div>' +
         '<div class="srow-in"><input class="input" name="min" inputmode="decimal" value="' + e(vMin) + '" placeholder="min" aria-label="Target min ' + e(x.tag) + '"><span class="muted">–</span><input class="input" name="max" inputmode="decimal" value="' + e(vMax) + '" placeholder="max" aria-label="Target max ' + e(x.tag) + '"><input class="input srow-umur" name="umur" value="' + e(x.umur || SARAN_UMUR) + '" placeholder="Umur" aria-label="Umur ' + e(x.tag) + '"></div></div>';
     }
-    view.innerHTML = adminBar('stok') + '<div class="wrap stack mt"><div class="card small between"><span>Domba di QDF Ternak: <b>' + d.items.length + '</b></span><span>Tampil &amp; tersedia: <b>' + avail.length + '</b> · dipesan: <b>' + d.items.filter(function (x) { return x.pesanan; }).length + '</b></span></div>' +
-      '<div class="card stack stok-tools"><div class="row"><input class="input" id="s-cari" type="search" placeholder="Cari eartag, mis. QD-025" autocomplete="off" aria-label="Cari eartag"><select class="input" id="s-filter" aria-label="Saring" style="max-width:150px"><option value="semua">Semua</option><option value="tampil">Sudah tampil</option><option value="belum">Belum tampil</option><option value="dipesan">Dipesan</option></select></div>' +
+    view.innerHTML = adminBar('stok') + '<div class="wrap stack mt"><div class="card small between"><span>Domba di QDF Ternak: <b>' + d.items.length + '</b> <button type="button" class="btn btn-ghost btn-sm" id="s-segar" title="Bobot &amp; foto dari QDF disegarkan otomatis tiap 10 menit">↻ Muat ulang dari QDF</button></span><span>Tampil &amp; tersedia: <b>' + avail.length + '</b> · dipesan: <b>' + d.items.filter(function (x) { return x.pesanan; }).length + '</b></span></div>' +
+      '<div class="card stack stok-tools"><div class="row"><input class="input" id="s-cari" data-bebas="1" type="search" placeholder="Cari eartag, mis. QD-025" autocomplete="off" aria-label="Cari eartag"><select class="input" id="s-filter" data-bebas="1" aria-label="Saring" style="max-width:150px"><option value="semua">Semua</option><option value="tampil">Sudah tampil</option><option value="belum">Belum tampil</option><option value="dipesan">Dipesan</option></select></div>' +
       '<div class="between"><label class="check"><input type="checkbox" id="s-all"> Centang semua yang terlihat</label><span class="xs muted" id="s-count"></span></div></div>' +
       '<div class="card stok-list" id="s-list">' + d.items.map(rowHtml).join('') + '</div>' +
       '<p class="xs muted">Kolom target dan umur sudah terisi saran: target <b>bobot aman + 2 kg</b> (min) dan <b>min + 5 kg</b> (max), umur <b>14 bulan</b>. Centang domba yang mau ditampilkan, ganti angka bila perlu, lalu tekan <b>Simpan perubahan</b> sekali untuk semuanya. Bobot, foto, kandang &amp; status diambil otomatis dari QDF Ternak; target awal juga dari QDF Ternak. Domba berstatus Sakit tidak tampil. Tombol <b>Saran</b> = perkiraan bobot aman sampai timbang akhir + 5 kg. Tanda ⚠ berarti target di atas saran itu.</p>' +
@@ -934,15 +1015,15 @@
       var ch = dirtyRows(), btn = this, bad = null;
       ch.forEach(function (r) { var v = cur(r); if (!bad && v.tampil && (!v.min || !v.max)) bad = r; });
       if (bad) { toast('Isi target min dan max dulu untuk ' + d.items[Number(bad.dataset.i)].tag + ' sebelum menampilkannya.', true); bad.scrollIntoView({ block: 'center' }); qs('[name=min]', bad).focus(); return; }
-      busy(btn, true);
-      var last = null, failTag = '', chain = Promise.resolve();
-      ch.forEach(function (r) {
-        chain = chain.then(function () {
-          var x = d.items[Number(r.dataset.i)], v = cur(r); failTag = x.tag;
-          return api('simpanStok', { tag: x.tag, ras: 'Tanduk', min: v.min, max: v.max, umur: v.umur, tampil: v.tampil }).then(function (res) { last = res; });
-        });
-      });
-      chain.then(function () { toast(ch.length + ' domba disimpan.'); drawStok(last); }).catch(function (er) { busy(btn, false); toast((failTag ? failTag + ': ' : '') + er.message, true); });
+      busy(btn, true); btn.innerHTML = 'Menyimpan ' + ch.length + ' domba…';
+      var items = ch.map(function (r) { var x = d.items[Number(r.dataset.i)], v = cur(r); return { tag: x.tag, min: v.min, max: v.max, umur: v.umur, tampil: v.tampil, catatan: x.catatan || '' }; });
+      api('simpanStokMassal', { items: items }).then(function (res) {
+        putC('adminStok', {}, res); toast(ch.length + ' domba disimpan. Katalog sudah diperbarui.'); drawStok(res);
+      }).catch(function (er) { busy(btn, false); toast(er.message, true); });
+    };
+    qs('#s-segar').onclick = function () {
+      var btn = this; busy(btn, true);
+      api('adminStok', { segarkan: true }).then(function (res) { putC('adminStok', {}, res); toast('Data QDF Ternak dimuat ulang.'); drawStok(res); }).catch(function (er) { busy(btn, false); toast(er.message, true); });
     };
     var fm = document.getElementById('f-manual');
     fm.onsubmit = function (ev) {
@@ -953,7 +1034,7 @@
 
   function pageAdminHarga() {
     if (needAdmin()) return Promise.resolve();
-    return api('adminHarga', {}).then(function (d) { drawHarga(d); });
+    return data('adminHarga', {}).then(function (d) { drawHarga(d); });
   }
   function drawHarga(d) {
     var S = d.pengaturan, today = new Date(), first = new Date(today.getFullYear(), today.getMonth() + 1, 1);
@@ -972,12 +1053,12 @@
     var fh = document.getElementById('f-harga');
     fh.onsubmit = function (ev) {
       ev.preventDefault(); var dd = formData(fh), btn = fh.querySelector('[type=submit]'); busy(btn, true);
-      api('simpanHarga', { mulai: dd.mulai, harga: Number(String(dd.tanduk).replace(/\D/g, '')) }).then(function (res) { toast('Harga dijadwalkan.'); state.cfg = null; store('qb_cfg', null); drawHarga(res); }).catch(function (x) { busy(btn, false); toast(x.message, true); });
+      api('simpanHarga', { mulai: dd.mulai, harga: Number(String(dd.tanduk).replace(/\D/g, '')) }).then(function (res) { toast('Harga dijadwalkan.'); state.cfg = null; store('qb_cfg', null); putC('adminHarga', {}, res); drawHarga(res); }).catch(function (x) { busy(btn, false); toast(x.message, true); });
     };
     var fs = document.getElementById('f-set');
     fs.onsubmit = function (ev) {
       ev.preventDefault(); var dd = formData(fs), btn = fs.querySelector('[type=submit]'); busy(btn, true);
-      api('simpanPengaturan', { data: dd }).then(function (res) { toast('Pengaturan disimpan.'); state.cfg = null; store('qb_cfg', null); drawHarga(res); }).catch(function (x) { busy(btn, false); toast(x.message, true); });
+      api('simpanPengaturan', { data: dd }).then(function (res) { toast('Pengaturan disimpan.'); state.cfg = null; store('qb_cfg', null); putC('adminHarga', {}, res); drawHarga(res); }).catch(function (x) { busy(btn, false); toast(x.message, true); });
     };
   }
 
@@ -1004,7 +1085,9 @@
     [/^#\/admin\/stok$/, pageAdminStok],
     [/^#\/admin\/harga$/, pageAdminHarga]
   ];
-  function route() {
+  function route(diam) {
+    diam = diam === true;
+    var sy = window.scrollY;
     state.timers.forEach(clearInterval); state.timers = [];
     document.body.classList.remove('has-sticky');
     var full = location.hash || '#/', qi = full.indexOf('?'), path = qi >= 0 ? full.slice(0, qi) : full, q = {};
@@ -1015,10 +1098,10 @@
       if (m) {
         var args = m.slice(1).filter(function (x) { return x !== undefined && x !== '/pesanan'; }).map(decodeURIComponent);
         args.push(q);
-        loading(); window.scrollTo(0, 0);
+        if (!diam) { loading(); window.scrollTo(0, 0); }
         var p;
         try { p = routes[i][1].apply(null, args); } catch (x) { p = Promise.reject(x); }
-        Promise.resolve(p).catch(fail);
+        Promise.resolve(p).then(function () { if (diam) window.scrollTo(0, sy); }, diam ? function () { } : fail);
         return;
       }
     }
@@ -1027,5 +1110,9 @@
   window.addEventListener('hashchange', route);
   document.getElementById('wa-float').href = waLink('Assalamu\'alaikum Qurbandong, saya ingin konsultasi qurban.');
   renderFooter(); route();
+  (window.requestIdleCallback || function (f) { setTimeout(f, 1200); })(function () {
+    prefetch('katalog');
+    if (state.sesi && state.sesi.peran === 'admin') { prefetch('adminPesanan', { filter: 'tindakan', q: '' }); prefetch('adminStok', {}); }
+  });
   cfg().then(function () { document.getElementById('wa-float').href = waLink('Assalamu\'alaikum Qurbandong, saya ingin konsultasi qurban.'); }).catch(function () { });
 })();
